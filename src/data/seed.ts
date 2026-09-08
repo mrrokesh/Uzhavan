@@ -1,3 +1,5 @@
+import type { ImageSourcePropType } from "react-native";
+
 export type CropStatus = "upcoming" | "ready";
 
 export type Crop = {
@@ -19,10 +21,10 @@ export type Crop = {
   minOrderKg: number;
   rating: number;
   about: string;
-  hasVideo: true | false;
-  image: string;
-  gallery: string[];
-  avatar: string;
+  hasVideo: boolean;
+  image: ImageSourcePropType;
+  gallery: ImageSourcePropType[];
+  avatar: ImageSourcePropType;
 };
 
 export type Truck = {
@@ -33,7 +35,7 @@ export type Truck = {
   capacityKg: number;
   etaMin: number;
   price: number;
-  photo: string;
+  photo: ImageSourcePropType;
   recommended?: boolean;
   tooSmall?: boolean;
   reason?: string;
@@ -45,31 +47,27 @@ export type Driver = {
   name: string;
   rating: number;
   trips: number;
-  photo: string;
+  photo: ImageSourcePropType;
   verified: boolean;
 };
 
 export const IMAGES = {
-  pomegranate: "/images/pomegranate.jpg",
-  pomegranateTree: "/images/orchard.jpg",
-  pomegranateCut: "/images/pomegranate.jpg",
-  orchard: "/images/farm.jpg",
-  farmerField: "/images/orchard.jpg",
-  turmeric: "/images/turmeric.jpg",
-  turmericHeap: "/images/turmeric.jpg",
-  orange: "/images/orange.jpg",
-  orangeGrove: "/images/grove.jpg",
-  truck: "/images/truck.jpg",
-  miniTruck: "/images/minitruck.jpg",
-  lcv: "/images/lcv.jpg",
-  warehouse: "/images/warehouse.jpg",
-  unloading: "/images/warehouse.jpg",
-  arul: "/images/arul.jpg",
-  muthu: "/images/muthu.jpg",
-  kannan: "/images/kannan.jpg",
-  selvam: "/images/selvam.jpg",
-  ramesh: "/images/ramesh.jpg",
-  buyer: "/images/buyer.jpg",
+  pomegranate: require("../../assets/images/pomegranate.jpg"),
+  orchard: require("../../assets/images/orchard.jpg"),
+  farm: require("../../assets/images/farm.jpg"),
+  turmeric: require("../../assets/images/turmeric.jpg"),
+  orange: require("../../assets/images/orange.jpg"),
+  grove: require("../../assets/images/grove.jpg"),
+  truck: require("../../assets/images/truck.jpg"),
+  miniTruck: require("../../assets/images/minitruck.jpg"),
+  lcv: require("../../assets/images/lcv.jpg"),
+  warehouse: require("../../assets/images/warehouse.jpg"),
+  arul: require("../../assets/images/arul.jpg"),
+  muthu: require("../../assets/images/muthu.jpg"),
+  kannan: require("../../assets/images/kannan.jpg"),
+  selvam: require("../../assets/images/selvam.jpg"),
+  ramesh: require("../../assets/images/ramesh.jpg"),
+  buyer: require("../../assets/images/buyer.jpg"),
 };
 
 export const crops: Crop[] = [
@@ -95,7 +93,7 @@ export const crops: Crop[] = [
       "Deep-red Bhagwa pomegranates grown on 12 acres in Natham. Fruit is sizing well after a dry spell and a late monsoon shower. Arils are sweet with a bright ruby colour — suited for wholesale, juice, and export packing.",
     hasVideo: true,
     image: IMAGES.pomegranate,
-    gallery: [IMAGES.farmerField, IMAGES.pomegranate, IMAGES.orchard, IMAGES.pomegranateTree],
+    gallery: [IMAGES.farm, IMAGES.pomegranate, IMAGES.orchard, IMAGES.orchard],
     avatar: IMAGES.arul,
   },
   {
@@ -119,8 +117,8 @@ export const crops: Crop[] = [
     about:
       "Finger turmeric from Attur, boiled and sun-cured on-farm. High curcumin colour, clean fingers, and uniform size. Ideal for mills, exporters, and warehouse stocking.",
     hasVideo: false,
-    image: IMAGES.turmericHeap,
-    gallery: [IMAGES.turmericHeap, IMAGES.turmeric, IMAGES.farmerField],
+    image: IMAGES.turmeric,
+    gallery: [IMAGES.turmeric, IMAGES.turmeric, IMAGES.farm],
     avatar: IMAGES.muthu,
   },
   {
@@ -145,7 +143,7 @@ export const crops: Crop[] = [
       "Hill oranges from a family orchard above Ooty. Tight skin, good juice, and a sharp-sweet balance that Chennai and Coimbatore markets ask for every season.",
     hasVideo: true,
     image: IMAGES.orange,
-    gallery: [IMAGES.orangeGrove, IMAGES.orange, IMAGES.orchard],
+    gallery: [IMAGES.grove, IMAGES.orange, IMAGES.farm],
     avatar: IMAGES.kannan,
   },
 ];
@@ -200,12 +198,7 @@ export const trucks: Truck[] = [
   },
 ];
 
-export const fare = {
-  base: 2900,
-  loading: 350,
-  protection: 200,
-  total: 3450,
-};
+export const fare = { base: 2900, loading: 350, protection: 200, total: 3450 };
 
 export const buyer = {
   name: "Karthik Rajan",
@@ -264,7 +257,7 @@ export type BookingCargo = {
   pickupShort: string;
   destination: string;
   destinationFull: string;
-  image: string;
+  image: ImageSourcePropType;
   farmName: string;
   farmer: string;
   harvestDate: string;
@@ -272,10 +265,7 @@ export type BookingCargo = {
   bookingId: string;
 };
 
-export function cargoFor(
-  source: "pomegranate" | "turmeric",
-  quantity: number,
-): BookingCargo {
+export function cargoFor(source: "pomegranate" | "turmeric", quantity: number): BookingCargo {
   if (source === "pomegranate") {
     return {
       product: "Bhagwa Pomegranates",
@@ -299,7 +289,7 @@ export function cargoFor(
     pickupShort: "Muthu Farms, Attur",
     destination: turmericOrder.destination,
     destinationFull: turmericOrder.destinationFull,
-    image: IMAGES.turmericHeap,
+    image: IMAGES.turmeric,
     farmName: turmericOrder.farmName,
     farmer: turmericOrder.farmer,
     harvestDate: turmericOrder.harvestDate,

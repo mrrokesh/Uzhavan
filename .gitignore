@@ -1,6 +1,15 @@
 node_modules
+.expo
 dist
 .DS_Store
 *.local
 .verify
 WhatsApp Image*
+ios
+android
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.idea

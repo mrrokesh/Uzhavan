@@ -1,18 +1,29 @@
 # Uzhavan
 
-Direct farm-to-buyer marketplace for Tamil Nadu. Buyers discover crops before harvest, request a quantity, confirm the price the farmer sets, then book a local truck from farm to warehouse. No middlemen.
-
-This repo is the **buyer-side** app — high-fidelity iOS screens (390 × 844) wired into two end-to-end flows.
+React Native (Expo) buyer app for a farm-to-buyer marketplace in Tamil Nadu. Buyers discover crops before harvest, request a quantity, confirm the price the farmer sets, then book a local truck from farm to warehouse. No middlemen.
 
 **Repo:** [github.com/mrrokesh/Uzhavan](https://github.com/mrrokesh/Uzhavan)
 
 ---
 
+## Run
+
+```bash
+npm install
+npx expo start
+```
+
+Scan the QR code with **Expo Go** on iOS or Android. Press `i` for the iOS simulator or `a` for Android.
+
+Requires Node 22+ and the [Expo Go](https://expo.dev/go) app (or Xcode / Android Studio).
+
+---
+
 ## Product rules
 
-1. Price is never final until the farmer says so. Every pre-acceptance figure is labelled **Estimated**, with “Final price confirmed by farmer.”
+1. Price is never final until the farmer says so. Pre-acceptance figures are labelled **Estimated**, with “Final price confirmed by farmer.”
 2. No payment is collected before the farmer accepts.
-3. Transport is a separate, optional step after the crop order is confirmed. Buyers can always choose **Use a private truck**.
+3. Transport is optional and happens after the crop order is confirmed. Buyers can always choose **Use a private truck**.
 4. Status is always visible: green = done / ready, amber = waiting, grey = not started.
 5. Trucks that cannot carry the load stay in the list, disabled, with a reason.
 
@@ -24,7 +35,7 @@ This repo is the **buyer-side** app — high-fidelity iOS screens (390 × 844) w
 
 Home → **Bhagwa pomegranates** (Arul Farms, Natham, Dindigul) → 2,000 kg → send request `UZH-REQ-1809` → farmer accepts at **₹95/kg** (`₹1,90,000`) → confirm quantity → book truck → pay **₹3,450** UPI → track Selvam (`TN 30 AB 4821`) → delivered.
 
-On **Request details**, tap **Farmer responded — view update** to continue the acceptance path.
+On **Request details**, tap **Farmer responded — view update**.
 
 ### 2. Book Track (tab)
 
@@ -47,7 +58,7 @@ Ready-for-pickup **turmeric**, 3,200 kg, Muthu Farms (Attur) → Salem Agro Ware
 | Trip | Review booking, finding truck, truck confirmed, live track, delivery completed |
 | Account | My Orders, Profile (Karthik Traders, Salem) |
 
-Bottom tabs: **Home · Book Track · My Orders · Profile**
+Native tabs: **Home · Book Track · My Orders · Profile**
 
 Seed farms: Arul Farms (Dindigul), Muthu Farms (Attur, Salem), Kannan Orchard (Ooty).
 
@@ -65,42 +76,10 @@ Seed farms: Arul Farms (Dindigul), Muthu Farms (Attur, Salem), Kannan Orchard (O
 | Destructive (outline only) | `#D64545` |
 | Text | `#1A1A1A` / `#6B7280` / `#9CA3AF` |
 
-Cards 16px radius, full-width buttons 52px / 12px radius. Indian rupee formatting (`₹1,90,000`), weights in kg.
-
----
-
-## Run locally
-
-```bash
-npm install
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173).
-
-```bash
-npm run build    # production build
-npm run preview  # serve the build
-```
-
-Requires Node 22+.
-
----
-
-## Deploy (GitHub Pages)
-
-Push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
-
-The repo owner needs Pages turned on once:
-
-1. [Settings → Pages](https://github.com/mrrokesh/Uzhavan/settings/pages)
-2. **Source:** GitHub Actions
-3. For a public URL on a free plan, set the repo to **public** (private Pages needs GitHub Pro)
-
-Live path after that: `https://mrrokesh.github.io/Uzhavan/`
+Indian rupee formatting (`₹1,90,000`), weights in kg.
 
 ---
 
 ## Stack
 
-React 19, TypeScript, Vite 7, Tailwind CSS 4, React Router 7.
+Expo 54, React Native 0.81, React Navigation 7 (native stack + bottom tabs), TypeScript.

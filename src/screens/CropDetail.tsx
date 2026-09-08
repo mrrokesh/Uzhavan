@@ -1,25 +1,20 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import type { ReactNode } from "react";
-import {
-  ChevronLeft,
-  Heart,
-  Info,
-  MapPin,
-  Play,
-  Share2,
-  ShoppingCart,
-} from "lucide-react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Chrome";
 import { Chip, PrimaryButton } from "../components/ui";
 import { useApp } from "../context/AppContext";
 import { getCrop } from "../data/seed";
 import { inr, kg } from "../lib/format";
+import type { RootStackParamList } from "../navigation/types";
+import { colors, shadow } from "../theme";
 
 export function CropDetail() {
-  const { id } = useParams();
-  const crop = getCrop(id ?? "bhagwa");
-  const navigate = useNavigate();
+  const { id } = useRoute<RouteProp<RootStackParamList, "CropDetail">>().params;
+  const crop = getCrop(id);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { setCropId, saved, toggleSaved } = useApp();
   const [slide, setSlide] = useState(0);
   const [more, setMore] = useState(false);
@@ -27,158 +22,158 @@ export function CropDetail() {
 
   return (
     <Screen
-      tab="home"
       footer={
-        <div>
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[12px] text-muted">Estimated</p>
-              <p className="text-[24px] font-bold leading-none text-ink">{inr(crop.pricePerKg)}/kg</p>
-            </div>
-            <p className="flex items-center gap-1 text-right text-[11px] leading-snug text-muted">
-              Final price confirmed by farmer <Info size={12} />
-            </p>
-          </div>
+        <>
+          <View style={styles.priceRow}>
+            <View>
+              <Text style={styles.muted}>Estimated</Text>
+              <Text style={styles.price}>{inr(crop.pricePerKg)}/kg</Text>
+            </View>
+            <Text style={styles.note}>Final price confirmed by farmer ⓘ</Text>
+          </View>
           <PrimaryButton
-            onClick={() => {
+            label="Select quantity"
+            onPress={() => {
               setCropId(crop.id);
-              navigate(`/crop/${crop.id}/quantity`);
+              navigation.navigate("SelectQuantity", { id: crop.id });
             }}
-          >
-            Select quantity
-          </PrimaryButton>
-        </div>
+          />
+        </>
       }
     >
-      <div className="relative h-[320px]">
-        <img src={hero} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/25" />
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <div className="absolute right-4 top-4 flex gap-2">
-          {[
-            {
-              icon: <Heart size={18} className={saved.includes(crop.id) ? "fill-danger text-danger" : ""} />,
-              onClick: () => toggleSaved(crop.id),
-            },
-            { icon: <Share2 size={18} />, onClick: () => {} },
-            { icon: <ShoppingCart size={18} />, onClick: () => navigate("/orders") },
-          ].map((btn, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={btn.onClick}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white"
-            >
-              {btn.icon}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/95"
-        >
-          <Play size={22} className="ml-0.5 fill-ink" />
-        </button>
-        <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-1.5">
-          {crop.gallery.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setSlide(i)}
-              className={`h-1.5 rounded-full ${i === slide ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
-            />
-          ))}
-        </div>
-        <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] text-white">
-          🖼 Gallery · {crop.gallery.length + 4}
-        </span>
-      </div>
-
-      <div className="px-4 pb-6 pt-4">
-        <Chip tone="amber">🕒 {crop.statusLabel}</Chip>
-        <h1 className="mt-2 text-[22px] font-semibold text-ink">{crop.title}</h1>
-        <p className="mt-1 text-[13px] text-muted">
-          {kg(crop.expectedKg)} expected · {crop.grade}
-        </p>
-
-        <div className="mt-4 flex items-center gap-3 rounded-[16px] bg-white p-3 shadow-[var(--shadow-card)]">
-          <img src={crop.avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold text-ink">{crop.farmName}</p>
-            <p className="text-[12px] text-muted">
-              {crop.ownerName} · ★ {crop.rating}
-            </p>
-            <p className="text-[12px] text-muted">{crop.district}</p>
-          </div>
-          <button type="button" className="text-[12px] font-semibold text-forest">
-            View farmer ›
-          </button>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {crop.gallery.slice(0, 3).map((src) => (
-            <img key={src} src={src} alt="" className="h-20 w-full rounded-[12px] object-cover" />
-          ))}
-        </div>
-
-        <div className="mt-4 space-y-3 rounded-[16px] bg-white p-3.5 shadow-[var(--shadow-card)]">
-          <Spec icon={<MapPin size={16} />} label="Farm location" value={crop.location} />
-          <Spec icon={<LeafIcon />} label="Category" value={crop.category} />
-          <Spec icon={<CalIcon />} label="Expected harvest" value={crop.harvestDate} />
-          <Spec icon={<BagIcon />} label="Minimum order" value={kg(crop.minOrderKg)} />
-        </div>
-
-        <h2 className="mt-5 text-[15px] font-semibold">About this crop</h2>
-        <p className={`mt-1.5 text-[13.5px] leading-relaxed text-muted ${more ? "" : "line-clamp-3"}`}>
-          {crop.about}
-        </p>
-        <button type="button" onClick={() => setMore((v) => !v)} className="mt-1 text-[13px] font-semibold text-forest">
-          {more ? "See less" : "See more"}
-        </button>
-      </div>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Image source={hero} style={styles.heroImg} />
+          <Pressable style={[styles.fab, { left: 16 }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          </Pressable>
+          <View style={styles.fabs}>
+            <Pressable style={styles.fab} onPress={() => toggleSaved(crop.id)}>
+              <Ionicons name={saved.includes(crop.id) ? "heart" : "heart-outline"} size={18} color={saved.includes(crop.id) ? colors.danger : colors.ink} />
+            </Pressable>
+            <Pressable style={styles.fab}>
+              <Ionicons name="share-outline" size={18} color={colors.ink} />
+            </Pressable>
+            <Pressable style={styles.fab} onPress={() => navigation.navigate("Tabs")}>
+              <Ionicons name="cart-outline" size={18} color={colors.ink} />
+            </Pressable>
+          </View>
+          <View style={styles.play}>
+            <Ionicons name="play" size={22} color={colors.ink} />
+          </View>
+          <View style={styles.dots}>
+            {crop.gallery.map((_, i) => (
+              <Pressable key={i} onPress={() => setSlide(i)} style={[styles.dot, i === slide && styles.dotOn]} />
+            ))}
+          </View>
+          <View style={styles.gallery}>
+            <Text style={styles.galleryText}>🖼 Gallery · {crop.gallery.length + 4}</Text>
+          </View>
+        </View>
+        <View style={styles.pad}>
+          <Chip label={`🕒 ${crop.statusLabel}`} tone="amber" />
+          <Text style={styles.title}>{crop.title}</Text>
+          <Text style={styles.muted}>
+            {kg(crop.expectedKg)} expected · {crop.grade}
+          </Text>
+          <View style={styles.farmer}>
+            <Image source={crop.avatar} style={styles.av} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.farm}>{crop.farmName}</Text>
+              <Text style={styles.muted}>
+                {crop.ownerName} · ★ {crop.rating}
+              </Text>
+              <Text style={styles.muted}>{crop.district}</Text>
+            </View>
+            <Text style={styles.link}>View farmer ›</Text>
+          </View>
+          <View style={styles.thumbs}>
+            {crop.gallery.slice(0, 3).map((src, i) => (
+              <Image key={i} source={src} style={styles.thumb} />
+            ))}
+          </View>
+          <View style={styles.specs}>
+            <Spec label="Farm location" value={crop.location} icon="location-outline" />
+            <Spec label="Category" value={crop.category} icon="leaf-outline" />
+            <Spec label="Expected harvest" value={crop.harvestDate} icon="calendar-outline" />
+            <Spec label="Minimum order" value={kg(crop.minOrderKg)} icon="bag-outline" />
+          </View>
+          <Text style={styles.aboutTitle}>About this crop</Text>
+          <Text style={styles.about} numberOfLines={more ? undefined : 3}>
+            {crop.about}
+          </Text>
+          <Pressable onPress={() => setMore((v) => !v)}>
+            <Text style={styles.link}>{more ? "See less" : "See more"}</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
 
-function Spec({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function Spec({ label, value, icon }: { label: string; value: string; icon: keyof typeof Ionicons.glyphMap }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-mint text-forest">{icon}</span>
-      <div>
-        <p className="text-[11px] text-muted">{label}</p>
-        <p className="text-[13px] font-medium text-ink">{value}</p>
-      </div>
-    </div>
+    <View style={styles.spec}>
+      <View style={styles.specIcon}>
+        <Ionicons name={icon} size={16} color={colors.forest} />
+      </View>
+      <View>
+        <Text style={styles.specLabel}>{label}</Text>
+        <Text style={styles.specValue}>{value}</Text>
+      </View>
+    </View>
   );
 }
 
-function LeafIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M5 19c8-1 12-8 13-15-8 2-14 8-13 15z" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-function CalIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <rect x="4" y="6" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M8 4v4M16 4v4M4 10h16" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-function BagIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M7 8h10l1 12H6L7 8z" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M9 8V7a3 3 0 0 1 6 0v1" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
+const styles = StyleSheet.create({
+  hero: { height: 320 },
+  heroImg: { width: "100%", height: "100%" },
+  fab: {
+    position: "absolute",
+    top: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fabs: { position: "absolute", top: 16, right: 16, flexDirection: "row", gap: 8 },
+  play: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginLeft: -28,
+    marginTop: -28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#fffffff2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dots: { position: "absolute", bottom: 12, alignSelf: "center", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#ffffff80" },
+  dotOn: { width: 16, backgroundColor: colors.white },
+  gallery: { position: "absolute", right: 12, bottom: 12, backgroundColor: "#0000008c", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  galleryText: { color: colors.white, fontSize: 11 },
+  pad: { padding: 16, paddingBottom: 24 },
+  title: { marginTop: 8, fontSize: 22, fontWeight: "600", color: colors.ink },
+  muted: { fontSize: 13, color: colors.muted },
+  farmer: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, ...shadow },
+  av: { width: 48, height: 48, borderRadius: 24 },
+  farm: { fontSize: 14, fontWeight: "600" },
+  link: { fontSize: 12, fontWeight: "600", color: colors.forest },
+  thumbs: { marginTop: 12, flexDirection: "row", gap: 8 },
+  thumb: { flex: 1, height: 80, borderRadius: 12 },
+  specs: { marginTop: 16, backgroundColor: colors.white, borderRadius: 16, padding: 14, gap: 12, ...shadow },
+  spec: { flexDirection: "row", alignItems: "center", gap: 12 },
+  specIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center" },
+  specLabel: { fontSize: 11, color: colors.muted },
+  specValue: { fontSize: 13, fontWeight: "500", color: colors.ink },
+  aboutTitle: { marginTop: 20, fontSize: 15, fontWeight: "600" },
+  about: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: colors.muted },
+  priceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 },
+  price: { fontSize: 24, fontWeight: "700", color: colors.ink },
+  note: { fontSize: 11, color: colors.muted, maxWidth: 140, textAlign: "right" },
+});

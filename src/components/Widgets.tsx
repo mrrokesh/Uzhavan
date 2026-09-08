@@ -1,29 +1,10 @@
 import type { ReactNode } from "react";
-import { BadgeCheck, Bookmark, MoreHorizontal, Play } from "lucide-react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { Crop } from "../data/seed";
 import { kg } from "../lib/format";
+import { colors, shadow } from "../theme";
 import { Chip } from "./ui";
-
-export function FarmerLine({
-  avatar,
-  name,
-  district,
-}: {
-  avatar: string;
-  name: string;
-  district: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <img src={avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-      <p className="text-[13px] font-medium text-ink">
-        {name}
-        <BadgeCheck className="ml-1 inline fill-[#2B7BFF] text-white" size={14} />
-        <span className="font-normal text-muted"> · {district}</span>
-      </p>
-    </div>
-  );
-}
 
 export function FeedCard({
   crop,
@@ -37,103 +18,80 @@ export function FeedCard({
   onSave: () => void;
 }) {
   return (
-    <article className="rounded-[16px] bg-white p-3.5 shadow-[var(--shadow-card)]">
-      <button type="button" onClick={onOpen} className="w-full text-left">
-        <FarmerLine avatar={crop.avatar} name={crop.farmName} district={crop.district} />
-        <div className="mt-2.5 flex gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[16px] font-semibold leading-snug text-ink">{crop.headline}</h2>
-            <div className="mt-2">
-              <Chip tone={crop.status === "ready" ? "mint" : "amber"}>
-                {crop.status === "ready" ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12.5 10 17.5 19 7.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
-                    <path d="M12 8v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
-                )}
-                {crop.statusLabel}
-              </Chip>
-            </div>
-            <p className="mt-2 text-[12.5px] text-muted">
+    <View style={styles.card}>
+      <Pressable onPress={onOpen}>
+        <View style={styles.farmer}>
+          <Image source={crop.avatar} style={styles.avatar} />
+          <Text style={styles.farmName}>
+            {crop.farmName} <Text style={{ color: colors.blueTick }}>✓</Text>
+            <Text style={styles.muted}> · {crop.district}</Text>
+          </Text>
+        </View>
+        <View style={styles.body}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headline}>{crop.headline}</Text>
+            <View style={{ marginTop: 8 }}>
+              <Chip label={crop.statusLabel} tone={crop.status === "ready" ? "mint" : "amber"} />
+            </View>
+            <Text style={styles.meta}>
               {kg(crop.expectedKg)} expected · {crop.grade}
-            </p>
-          </div>
-          <div className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[14px]">
-            <img src={crop.image} alt="" className="h-full w-full object-cover" />
+            </Text>
+          </View>
+          <View style={styles.thumbWrap}>
+            <Image source={crop.image} style={styles.thumb} />
             {crop.hasVideo ? (
-              <span className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/95">
-                  <Play size={14} className="ml-0.5 fill-ink text-ink" />
-                </span>
-              </span>
+              <View style={styles.play}>
+                <Ionicons name="play" size={14} color={colors.ink} />
+              </View>
             ) : null}
-          </div>
-        </div>
-      </button>
-      <div className="mt-2 flex items-center gap-3 text-muted">
-        <button type="button" onClick={onSave} aria-label="Save">
-          <Bookmark size={20} strokeWidth={1.7} className={saved ? "fill-forest text-forest" : ""} />
-        </button>
-        <button type="button" aria-label="More">
-          <MoreHorizontal size={20} strokeWidth={1.7} />
-        </button>
-      </div>
-    </article>
+          </View>
+        </View>
+      </Pressable>
+      <View style={styles.actions}>
+        <Pressable onPress={onSave}>
+          <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.forest : colors.muted} />
+        </Pressable>
+        <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+      </View>
+    </View>
   );
 }
 
 export function CropSummary({ crop, extra }: { crop: Crop; extra?: ReactNode }) {
   return (
-    <div className="flex gap-3 rounded-[16px] bg-white p-3 shadow-[var(--shadow-card)]">
-      <img src={crop.image} alt="" className="h-16 w-16 rounded-[12px] object-cover" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[16px] font-semibold text-ink">{crop.title}</p>
-        <p className="mt-0.5 text-[13px] text-ink">
-          {crop.farmName}
-          <BadgeCheck className="ml-1 inline fill-[#2B7BFF] text-white" size={13} />
-        </p>
-        <p className="text-[12px] text-muted">{crop.district}</p>
+    <View style={styles.summary}>
+      <Image source={crop.image} style={styles.sumImg} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.sumTitle}>{crop.title}</Text>
+        <Text style={styles.farmName}>
+          {crop.farmName} <Text style={{ color: colors.blueTick }}>✓</Text>
+        </Text>
+        <Text style={styles.muted}>{crop.district}</Text>
         {extra}
-      </div>
-    </div>
+      </View>
+    </View>
   );
 }
 
 export function Stepper({
   value,
-  unit = "kg",
   onDec,
   onInc,
 }: {
   value: number;
-  unit?: string;
   onDec: () => void;
   onInc: () => void;
 }) {
   return (
-    <div className="flex items-center justify-center gap-6">
-      <button
-        type="button"
-        onClick={onDec}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-mint text-2xl font-medium text-forest"
-      >
-        −
-      </button>
-      <p className="min-w-[130px] text-center text-[28px] font-bold text-ink">
-        {new Intl.NumberFormat("en-IN").format(value)} {unit}
-      </p>
-      <button
-        type="button"
-        onClick={onInc}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-forest text-2xl font-medium text-white"
-      >
-        +
-      </button>
-    </div>
+    <View style={styles.stepper}>
+      <Pressable onPress={onDec} style={styles.stepMinus}>
+        <Text style={styles.stepGlyph}>−</Text>
+      </Pressable>
+      <Text style={styles.stepValue}>{new Intl.NumberFormat("en-IN").format(value)} kg</Text>
+      <Pressable onPress={onInc} style={styles.stepPlus}>
+        <Text style={[styles.stepGlyph, { color: colors.white }]}>+</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -143,95 +101,126 @@ export function Tracker({
   steps: { title: string; meta: string; state: "done" | "current" | "pending" }[];
 }) {
   return (
-    <div className="px-1">
+    <View>
       {steps.map((step, i) => {
         const last = i === steps.length - 1;
         return (
-          <div key={step.title} className="flex gap-3">
-            <div className="flex flex-col items-center">
+          <View key={step.title} style={styles.stepRow}>
+            <View style={styles.rail}>
               {step.state === "done" ? (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-forest">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12.5 10 17.5 19 7.5" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
-                  </svg>
-                </span>
+                <View style={styles.dotDone}>
+                  <Ionicons name="checkmark" size={12} color={colors.white} />
+                </View>
               ) : step.state === "current" ? (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-bg">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-text" />
-                </span>
+                <View style={styles.dotCurrent}>
+                  <View style={styles.dotInner} />
+                </View>
               ) : (
-                <span className="h-6 w-6 rounded-full border-2 border-[#d8d3cb] bg-white" />
+                <View style={styles.dotPending} />
               )}
-              {last ? null : (
-                <span
-                  className={`my-1 w-px flex-1 ${step.state === "done" ? "bg-forest" : "bg-[#e4dfd6]"}`}
-                  style={{ minHeight: 22 }}
-                />
-              )}
-            </div>
-            <div className={`pb-4 ${last ? "pb-0" : ""}`}>
-              <p
-                className={`text-[14px] font-semibold ${
-                  step.state === "pending" ? "text-faint" : "text-ink"
-                }`}
-              >
-                {step.title}
-              </p>
-              <p
-                className={`text-[12px] ${
-                  step.state === "current" ? "text-amber-text" : step.state === "done" ? "text-muted" : "text-faint"
-                }`}
+              {last ? null : <View style={[styles.line, step.state === "done" && { backgroundColor: colors.forest }]} />}
+            </View>
+            <View style={{ paddingBottom: last ? 0 : 16, flex: 1 }}>
+              <Text style={[styles.stepTitle, step.state === "pending" && { color: colors.faint }]}>{step.title}</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: step.state === "current" ? colors.amberText : step.state === "done" ? colors.muted : colors.faint,
+                }}
               >
                 {step.meta}
-              </p>
-            </div>
-          </div>
+              </Text>
+            </View>
+          </View>
         );
       })}
-    </div>
+    </View>
   );
 }
 
-export function RouteStops({
-  pickup,
-  drop,
-  editable,
-  onEdit,
-}: {
-  pickup: string;
-  drop: string;
-  editable?: boolean;
-  onEdit?: () => void;
-}) {
+export function RouteStops({ pickup, drop }: { pickup: string; drop: string }) {
   return (
-    <div className="relative pl-5">
-      <div className="absolute top-2 bottom-2 left-[7px] border-l-2 border-dashed border-forest/40" />
-      <div className="relative pb-5">
-        <span className="absolute -left-5 top-1.5 h-3.5 w-3.5 rounded-full bg-forest" />
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Pickup</p>
-        <p className="text-[14px] font-semibold text-ink">{pickup}</p>
-      </div>
-      <div className="relative">
-        <span className="absolute -left-5 top-1.5 h-3.5 w-3.5 rounded-full bg-amber-text" />
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Destination</p>
-            <p className="text-[14px] font-semibold text-ink">{drop}</p>
-          </div>
-          {editable ? (
-            <button type="button" onClick={onEdit} className="text-forest" aria-label="Edit destination">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+    <View style={{ paddingLeft: 20 }}>
+      <View style={styles.dash} />
+      <View style={{ paddingBottom: 20 }}>
+        <View style={[styles.pin, { backgroundColor: colors.forest }]} />
+        <Text style={styles.stopLabel}>PICKUP</Text>
+        <Text style={styles.stopValue}>{pickup}</Text>
+      </View>
+      <View>
+        <View style={[styles.pin, { backgroundColor: colors.amberText }]} />
+        <Text style={styles.stopLabel}>DESTINATION</Text>
+        <Text style={styles.stopValue}>{drop}</Text>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: { backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
+  farmer: { flexDirection: "row", alignItems: "center", gap: 8 },
+  avatar: { width: 28, height: 28, borderRadius: 14 },
+  farmName: { fontSize: 13, fontWeight: "500", color: colors.ink },
+  muted: { color: colors.muted, fontWeight: "400" },
+  body: { marginTop: 10, flexDirection: "row", gap: 12 },
+  headline: { fontSize: 16, fontWeight: "600", color: colors.ink, lineHeight: 22 },
+  meta: { marginTop: 8, fontSize: 12.5, color: colors.muted },
+  thumbWrap: { width: 92, height: 92 },
+  thumb: { width: 92, height: 92, borderRadius: 14 },
+  play: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#00000033",
+    borderRadius: 14,
+  },
+  actions: { marginTop: 8, flexDirection: "row", gap: 14 },
+  summary: { flexDirection: "row", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, ...shadow },
+  sumImg: { width: 64, height: 64, borderRadius: 12 },
+  sumTitle: { fontSize: 16, fontWeight: "600", color: colors.ink },
+  stepper: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20 },
+  stepMinus: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.mint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepPlus: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.forest,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepGlyph: { fontSize: 24, color: colors.forest, fontWeight: "500" },
+  stepValue: { minWidth: 130, textAlign: "center", fontSize: 28, fontWeight: "700", color: colors.ink },
+  stepRow: { flexDirection: "row", gap: 12 },
+  rail: { alignItems: "center", width: 24 },
+  dotDone: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.forest,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotCurrent: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.amberBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amberText },
+  dotPending: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#d8d3cb", backgroundColor: colors.white },
+  line: { width: 1, flex: 1, minHeight: 22, backgroundColor: "#e4dfd6", marginVertical: 4 },
+  stepTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  dash: { position: "absolute", left: 7, top: 8, bottom: 8, borderLeftWidth: 2, borderStyle: "dashed", borderColor: "#1B5E3B66" },
+  pin: { position: "absolute", left: -20, top: 6, width: 14, height: 14, borderRadius: 7 },
+  stopLabel: { fontSize: 11, fontWeight: "500", color: colors.muted, letterSpacing: 0.4 },
+  stopValue: { fontSize: 14, fontWeight: "600", color: colors.ink },
+});
