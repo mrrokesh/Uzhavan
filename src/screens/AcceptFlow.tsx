@@ -1,51 +1,43 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { BadgeCheck, Check, Clock, Info, Shield } from "lucide-react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppHeader, Screen } from "../components/Chrome";
 import { SuccessMark } from "../components/Logo";
-import { Chip, InfoNote, OutlineButton, PrimaryButton, RadioCard, Row, Divider } from "../components/ui";
+import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
 import { CropSummary, RouteStops, Tracker } from "../components/Widgets";
 import { useApp } from "../context/AppContext";
 import { getCrop, IMAGES, pomegranateOrder } from "../data/seed";
 import { inr, kg } from "../lib/format";
+import type { RootStackParamList } from "../navigation/types";
+import { colors, shadow } from "../theme";
 
 export function RequestUpdate() {
-  const navigate = useNavigate();
-  const { quantity, requestId } = useApp();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { quantity } = useApp();
   const crop = getCrop("bhagwa");
   const value = quantity * crop.pricePerKg;
 
   return (
-    <Screen
-      tab="orders"
-      footer={<PrimaryButton onClick={() => navigate(`/request/${requestId}/confirm`)}>Review & confirm</PrimaryButton>}
-    >
+    <Screen footer={<PrimaryButton label="Review & confirm" onPress={() => navigation.navigate("ConfirmPurchase")} />}>
       <AppHeader title="Request update" />
-      <div className="px-4 pb-6">
-        <div className="flex items-start gap-3 rounded-[16px] bg-mint p-3.5">
-          <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-white text-forest">
-            <Check size={16} strokeWidth={2.6} />
-          </span>
-          <div>
-            <p className="text-[15px] font-semibold text-forest">Farmer accepted your request</p>
-            <p className="mt-0.5 text-[12.5px] text-forest/80">
+      <ScrollView contentContainerStyle={styles.pad}>
+        <View style={styles.accept}>
+          <View style={styles.check}>
+            <Ionicons name="checkmark" size={16} color={colors.forest} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.acceptTitle}>Farmer accepted your request</Text>
+            <Text style={styles.acceptSub}>
               {crop.farmName} accepted your request for {kg(quantity)}.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <CropSummary
-            crop={crop}
-            extra={
-              <p className="text-[12px] text-muted">
-                {crop.farmName} <BadgeCheck className="inline fill-[#2B7BFF] text-white" size={12} /> · {crop.district}
-              </p>
-            }
-          />
-        </div>
-
-        <div className="mt-3 rounded-[16px] bg-white px-4 py-2 shadow-[var(--shadow-card)]">
+            </Text>
+          </View>
+        </View>
+        <View style={{ marginTop: 12 }}>
+          <CropSummary crop={crop} />
+        </View>
+        <View style={styles.list}>
           <Row label="Accepted quantity" value={kg(quantity)} strong />
           <Divider />
           <Row label="Final price" value={`${inr(crop.pricePerKg)}/kg`} strong />
@@ -53,16 +45,14 @@ export function RequestUpdate() {
           <Row label="Order value" value={inr(value)} green />
           <Divider />
           <Row label="Pickup from" value={crop.harvestDate} />
-        </div>
-
-        <div className="mt-3">
+        </View>
+        <View style={{ marginTop: 12 }}>
           <InfoNote tone="amber">
-            <Clock size={16} className="mt-0.5 shrink-0" />
-            Confirm by 6:00 PM today to reserve this quantity.
+            <Ionicons name="time-outline" size={16} color={colors.amberText} />
+            <Text style={{ flex: 1, color: colors.amberText, fontSize: 12.5 }}>Confirm by 6:00 PM today to reserve this quantity.</Text>
           </InfoNote>
-        </div>
-
-        <div className="mt-5">
+        </View>
+        <View style={{ marginTop: 20 }}>
           <Tracker
             steps={[
               { title: "Request sent", meta: "10:42 AM", state: "done" },
@@ -71,15 +61,15 @@ export function RequestUpdate() {
               { title: "Transport selection", meta: "Pending", state: "pending" },
             ]}
           />
-        </div>
-      </div>
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 export function ConfirmPurchase() {
-  const navigate = useNavigate();
-  const { quantity, setQuantityConfirmed, orderId } = useApp();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { quantity, setQuantityConfirmed } = useApp();
   const crop = getCrop("bhagwa");
   const [ok, setOk] = useState(true);
   const [declined, setDeclined] = useState(false);
@@ -87,28 +77,24 @@ export function ConfirmPurchase() {
 
   return (
     <Screen
-      tab="orders"
       footer={
-        <div className="space-y-2">
+        <>
           <PrimaryButton
+            label="Confirm quantity"
             disabled={!ok}
-            onClick={() => {
+            onPress={() => {
               setQuantityConfirmed(true);
-              navigate(`/order/${orderId}/confirmed`);
+              navigation.navigate("QuantityConfirmed");
             }}
-          >
-            Confirm quantity
-          </PrimaryButton>
-          <OutlineButton tone="danger" onClick={() => setDeclined(true)}>
-            Decline offer
-          </OutlineButton>
-        </div>
+          />
+          <OutlineButton label="Decline offer" tone="danger" onPress={() => setDeclined(true)} />
+        </>
       }
     >
       <AppHeader title="Confirm purchase" />
-      <div className="px-4 pb-6">
-        <CropSummary crop={crop} extra={<p className="text-[12px] text-muted">{crop.location}</p>} />
-        <div className="mt-3 rounded-[16px] bg-white px-4 py-2 shadow-[var(--shadow-card)]">
+      <ScrollView contentContainerStyle={styles.pad}>
+        <CropSummary crop={crop} extra={<Text style={styles.muted}>{crop.location}</Text>} />
+        <View style={styles.list}>
           <Row label="Accepted quantity" value={kg(quantity)} strong />
           <Divider />
           <Row label="Final price" value={`${inr(crop.pricePerKg)}/kg`} strong />
@@ -118,52 +104,46 @@ export function ConfirmPurchase() {
           <Row label="Expected harvest / pickup" value={crop.harvestDate} />
           <Divider />
           <Row label="Farm location" value={crop.location} />
-        </div>
-
-        <label className="mt-4 flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => setOk((v) => !v)}
-            className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-[5px] border ${
-              ok ? "border-forest bg-forest text-white" : "border-[#cfc8bc] bg-white"
-            }`}
-          >
-            {ok ? <Check size={13} strokeWidth={3} /> : null}
-          </button>
-          <span className="text-[13.5px] font-medium">I confirm the quantity and final price.</span>
-        </label>
-
-        <div className="mt-4">
+        </View>
+        <Pressable onPress={() => setOk((v) => !v)} style={styles.checkRow}>
+          <View style={[styles.box, ok && styles.boxOn]}>
+            {ok ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
+          </View>
+          <Text style={styles.confirm}>I confirm the quantity and final price.</Text>
+        </Pressable>
+        <View style={{ marginTop: 16 }}>
           <InfoNote>
-            <Shield size={16} className="mt-0.5 shrink-0" />
-            Transport will be selected next. Payment instructions will appear in My Orders.
+            <Ionicons name="shield-checkmark-outline" size={16} color={colors.forest} />
+            <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>Transport will be selected next. Payment instructions will appear in My Orders.</Text>
           </InfoNote>
-        </div>
-        {declined ? (
-          <p className="mt-3 text-center text-[12px] text-danger">Offer declined. The reserved quantity is released.</p>
-        ) : null}
-      </div>
+        </View>
+        {declined ? <Text style={styles.danger}>Offer declined. The reserved quantity is released.</Text> : null}
+      </ScrollView>
     </Screen>
   );
 }
 
 export function QuantityConfirmed() {
-  const navigate = useNavigate();
-  const { quantity, transport, setTransport, orderId } = useApp();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { quantity, transport, setTransport } = useApp();
   const crop = getCrop("bhagwa");
 
   return (
     <Screen
-      tab="orders"
-      footer={<PrimaryButton onClick={() => navigate(transport === "book" ? `/order/${orderId}/book-truck` : "/orders")}>Continue</PrimaryButton>}
+      footer={
+        <PrimaryButton
+          label="Continue"
+          onPress={() => navigation.navigate(transport === "book" ? "BookTruckOrder" : "Tabs")}
+        />
+      }
     >
-      <div className="px-4 pb-6 pt-6 text-center">
+      <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 24 }]}>
         <SuccessMark />
-        <h1 className="mt-3 text-[22px] font-semibold">Quantity confirmed!</h1>
-        <p className="mx-auto mt-1 max-w-[280px] text-[13.5px] text-muted">
+        <Text style={styles.h1}>Quantity confirmed!</Text>
+        <Text style={styles.sub}>
           {kg(quantity)} of {crop.title} is reserved for you.
-        </p>
-        <div className="mt-4 rounded-[16px] bg-white px-4 py-2 text-left shadow-[var(--shadow-card)]">
+        </Text>
+        <View style={[styles.list, { width: "100%" }]}>
           <Row label="Order ID" value={pomegranateOrder.id} strong />
           <Divider />
           <Row label="Order value" value={inr(quantity * crop.pricePerKg)} />
@@ -171,108 +151,127 @@ export function QuantityConfirmed() {
           <Row label="Pickup from" value={crop.harvestDate} />
           <Divider />
           <Row label="Farm" value={`${crop.farmName}, ${crop.location}`} />
-        </div>
-        <h2 className="mt-5 text-left text-[15px] font-semibold">How will you transport the crop?</h2>
-        <div className="mt-2 space-y-2 text-left">
-          <RadioCard selected={transport === "book"} onSelect={() => setTransport("book")}>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-mint text-forest">🚚</span>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-[14px] font-semibold">Book a truck</p>
-                  <Chip tone="amber" className="!px-2 !py-0.5">
-                    Recommended
-                  </Chip>
-                </div>
-                <p className="mt-0.5 text-[12px] text-muted">Find verified local trucks near the farm.</p>
-              </div>
-              <span className={`mt-1 h-4 w-4 rounded-full border-2 ${transport === "book" ? "border-forest bg-forest" : "border-[#cfc8bc]"}`} />
-            </div>
-          </RadioCard>
-          <RadioCard selected={transport === "private"} onSelect={() => setTransport("private")}>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-line text-muted">🚛</span>
-              <div className="flex-1">
-                <p className="text-[14px] font-semibold">Use a private truck</p>
-                <p className="mt-0.5 text-[12px] text-muted">Add your own vehicle and driver details.</p>
-              </div>
-              <span className={`mt-1 h-4 w-4 rounded-full border-2 ${transport === "private" ? "border-forest bg-forest" : "border-[#cfc8bc]"}`} />
-            </div>
-          </RadioCard>
-        </div>
-        <p className="mt-3 flex items-center justify-center gap-1 text-[12px] text-muted">
-          <Info size={12} /> You can change this later from My Orders.
-        </p>
-      </div>
+        </View>
+        <Text style={styles.section}>How will you transport the crop?</Text>
+        <Radio selected={transport === "book"} onPress={() => setTransport("book")} title="Book a truck" rec sub="Find verified local trucks near the farm." />
+        <Radio selected={transport === "private"} onPress={() => setTransport("private")} title="Use a private truck" sub="Add your own vehicle and driver details." />
+        <Text style={styles.mutedCenter}>ⓘ You can change this later from My Orders.</Text>
+      </ScrollView>
     </Screen>
   );
 }
 
 export function BookTruckOrder() {
-  const navigate = useNavigate();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { quantity, setTransport, setBookingSource } = useApp();
   const crop = getCrop("bhagwa");
 
   return (
     <Screen
-      tab="track"
       footer={
-        <div>
+        <>
           <PrimaryButton
-            onClick={() => {
+            label="Find nearby trucks"
+            onPress={() => {
               setBookingSource("pomegranate");
-              navigate("/book-track/pickup");
+              navigation.navigate("PickupDelivery");
             }}
-          >
-            Find nearby trucks
-          </PrimaryButton>
-          <button
-            type="button"
-            onClick={() => {
+          />
+          <Pressable
+            onPress={() => {
               setTransport("private");
-              navigate("/orders");
+              navigation.navigate("Tabs");
             }}
-            className="mt-2 w-full py-2 text-[14px] font-semibold text-forest"
           >
-            I'll use a private truck
-          </button>
-        </div>
+            <Text style={styles.textLink}>I'll use a private truck</Text>
+          </Pressable>
+        </>
       }
     >
       <AppHeader title="Book a truck" />
-      <div className="px-4 pb-6">
-        <div className="flex items-center gap-2 rounded-full bg-mint px-3 py-2 text-[12px] font-semibold text-forest">
-          🚚 For order {pomegranateOrder.id} · {crop.title}
-        </div>
-        <div className="mt-3 rounded-[16px] bg-white p-4 shadow-[var(--shadow-card)]">
-          <RouteStops pickup={crop.location} drop="Koyambedu Market, Chennai" editable />
-        </div>
-        <div className="mt-3 rounded-[16px] bg-white px-4 py-2 shadow-[var(--shadow-card)]">
+      <ScrollView contentContainerStyle={styles.pad}>
+        <View style={styles.orderChip}>
+          <Text style={styles.orderChipText}>
+            🚚 For order {pomegranateOrder.id} · {crop.title}
+          </Text>
+        </View>
+        <View style={[styles.list, { padding: 16 }]}>
+          <RouteStops pickup={crop.location} drop="Koyambedu Market, Chennai" />
+        </View>
+        <View style={styles.list}>
           <Row label="Crop load" value={kg(quantity)} strong />
           <Divider />
           <Row label="Pickup date" value={crop.harvestDate} />
-        </div>
-        <div className="relative mt-3 overflow-hidden rounded-[16px] border-2 border-forest bg-white shadow-[var(--shadow-card)]">
-          <img src={IMAGES.truck} alt="" className="h-32 w-full object-cover" />
-          <div className="p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Suggested vehicle</p>
-            <p className="text-[15px] font-semibold">Mini truck · Up to 2.5 tons</p>
-          </div>
-          <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-forest text-white">
-            <Check size={13} />
-          </span>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-[16px] bg-white p-3 shadow-[var(--shadow-card)]">
-            <p className="text-[11px] text-muted">📍 Distance</p>
-            <p className="mt-1 text-[18px] font-bold">57 km</p>
-          </div>
-          <div className="rounded-[16px] bg-white p-3 shadow-[var(--shadow-card)]">
-            <p className="text-[11px] text-muted">🕒 Est. time</p>
-            <p className="mt-1 text-[18px] font-bold">1 hr 35 min</p>
-          </div>
-        </div>
-      </div>
+        </View>
+        <View style={styles.suggest}>
+          <Image source={IMAGES.truck} style={styles.suggestImg} />
+          <View style={{ padding: 12 }}>
+            <Text style={styles.muted}>SUGGESTED VEHICLE</Text>
+            <Text style={styles.farm}>Mini truck · Up to 2.5 tons</Text>
+          </View>
+          <View style={styles.suggestCheck}>
+            <Ionicons name="checkmark" size={13} color={colors.white} />
+          </View>
+        </View>
+        <View style={styles.stats}>
+          <View style={styles.stat}>
+            <Text style={styles.muted}>📍 Distance</Text>
+            <Text style={styles.statN}>57 km</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.muted}>🕒 Est. time</Text>
+            <Text style={styles.statN}>1 hr 35 min</Text>
+          </View>
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
+
+function Radio({ selected, onPress, title, sub, rec }: { selected: boolean; onPress: () => void; title: string; sub: string; rec?: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.radio, selected && styles.radioOn]}>
+      <Text style={{ fontSize: 22 }}>{rec ? "🚚" : "🚛"}</Text>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={styles.farm}>{title}</Text>
+          {rec ? <Chip label="Recommended" tone="amber" /> : null}
+        </View>
+        <Text style={styles.muted}>{sub}</Text>
+      </View>
+      <View style={[styles.radioDot, selected && { backgroundColor: colors.forest, borderColor: colors.forest }]} />
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  pad: { paddingHorizontal: 16, paddingBottom: 24 },
+  accept: { flexDirection: "row", gap: 12, backgroundColor: colors.mint, borderRadius: 16, padding: 14 },
+  check: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+  acceptTitle: { fontSize: 15, fontWeight: "600", color: colors.forest },
+  acceptSub: { marginTop: 2, fontSize: 12.5, color: "#1B5E3BCC" },
+  list: { marginTop: 12, backgroundColor: colors.white, borderRadius: 16, paddingHorizontal: 16, ...shadow },
+  muted: { fontSize: 12, color: colors.muted },
+  checkRow: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12 },
+  box: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: "#cfc8bc", alignItems: "center", justifyContent: "center" },
+  boxOn: { backgroundColor: colors.forest, borderColor: colors.forest },
+  confirm: { fontSize: 13.5, fontWeight: "500", flex: 1 },
+  danger: { marginTop: 12, textAlign: "center", color: colors.danger, fontSize: 12 },
+  h1: { marginTop: 12, fontSize: 22, fontWeight: "600" },
+  sub: { marginTop: 6, fontSize: 13.5, color: colors.muted, textAlign: "center", maxWidth: 280 },
+  section: { marginTop: 20, alignSelf: "flex-start", fontSize: 15, fontWeight: "600" },
+  radio: { marginTop: 8, width: "100%", flexDirection: "row", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 14, borderWidth: 2, borderColor: "transparent", ...shadow },
+  radioOn: { borderColor: colors.forest },
+  radioDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: "#cfc8bc", marginTop: 4 },
+  mutedCenter: { marginTop: 12, fontSize: 12, color: colors.muted },
+  farm: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  textLink: { textAlign: "center", paddingVertical: 8, fontSize: 14, fontWeight: "600", color: colors.forest },
+  orderChip: { backgroundColor: colors.mint, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  orderChipText: { fontSize: 12, fontWeight: "600", color: colors.forest },
+  suggest: { marginTop: 12, borderRadius: 16, overflow: "hidden", borderWidth: 2, borderColor: colors.forest, backgroundColor: colors.white },
+  suggestImg: { width: "100%", height: 128 },
+  suggestCheck: { position: "absolute", right: 12, top: 12, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
+  stats: { marginTop: 12, flexDirection: "row", gap: 8 },
+  stat: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 12, ...shadow },
+  statN: { marginTop: 4, fontSize: 18, fontWeight: "700" },
+});

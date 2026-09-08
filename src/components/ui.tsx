@@ -1,95 +1,95 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Check } from "lucide-react";
+import type { ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, shadow } from "../theme";
 
 export function Card({
   children,
-  className = "",
-  selected = false,
-  onClick,
+  selected,
+  onPress,
+  style,
 }: {
   children: ReactNode;
-  className?: string;
   selected?: boolean;
-  onClick?: () => void;
+  onPress?: () => void;
+  style?: object;
 }) {
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={`w-full rounded-[16px] bg-white text-left shadow-[var(--shadow-card)] ${
-        selected ? "border-2 border-forest" : "border border-transparent"
-      } ${className}`}
-    >
-      {children}
-    </Tag>
+  const inner = (
+    <View style={[styles.card, selected && styles.cardSelected, style]}>{children}</View>
   );
+  if (!onPress) return inner;
+  return <Pressable onPress={onPress}>{inner}</Pressable>;
 }
 
 export function PrimaryButton({
-  children,
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <button
-      {...props}
-      className={`flex h-[52px] w-full items-center justify-center rounded-[12px] bg-forest text-[15px] font-semibold text-white disabled:opacity-40 ${className}`}
-    >
-      {children}
-    </button>
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.primary, disabled && { opacity: 0.4 }]}>
+      <Text style={styles.primaryText}>{label}</Text>
+    </Pressable>
   );
 }
 
 export function OutlineButton({
-  children,
+  label,
+  onPress,
   tone = "default",
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "default" | "danger" }) {
+  icon,
+}: {
+  label: string;
+  onPress?: () => void;
+  tone?: "default" | "danger";
+  icon?: keyof typeof Ionicons.glyphMap;
+}) {
+  const color = tone === "danger" ? colors.danger : colors.forest;
   return (
-    <button
-      {...props}
-      className={`flex h-[52px] w-full items-center justify-center gap-2 rounded-[12px] border bg-white text-[15px] font-semibold ${
-        tone === "danger" ? "border-danger text-danger" : "border-forest/20 text-forest"
-      } ${className}`}
-    >
-      {children}
-    </button>
+    <Pressable onPress={onPress} style={[styles.outline, { borderColor: tone === "danger" ? colors.danger : "#1B5E3B33" }]}>
+      {icon ? <Ionicons name={icon} size={16} color={color} /> : null}
+      <Text style={[styles.outlineText, { color }]}>{label}</Text>
+    </Pressable>
   );
 }
 
 export function Chip({
-  children,
+  label,
   active,
   tone = "neutral",
-  onClick,
-  className = "",
+  onPress,
 }: {
-  children: ReactNode;
+  label: string;
   active?: boolean;
   tone?: "neutral" | "amber" | "mint" | "forest";
-  onClick?: () => void;
-  className?: string;
+  onPress?: () => void;
 }) {
-  const tones = {
-    neutral: active
-      ? "bg-forest text-white"
-      : "bg-white text-ink border border-line",
-    amber: "bg-amber-bg text-amber-text",
-    mint: "bg-mint text-forest",
-    forest: "bg-forest text-white",
-  };
-  const Tag = onClick ? "button" : "span";
-  return (
-    <Tag
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3.5 py-1.5 text-[12px] font-medium ${tones[tone]} ${className}`}
-    >
-      {children}
-    </Tag>
+  const bg =
+    tone === "amber"
+      ? colors.amberBg
+      : tone === "mint"
+        ? colors.mint
+        : tone === "forest" || active
+          ? colors.forest
+          : colors.white;
+  const fg =
+    tone === "amber"
+      ? colors.amberText
+      : tone === "mint"
+        ? colors.forest
+        : tone === "forest" || active
+          ? colors.white
+          : colors.ink;
+  const node = (
+    <View style={[styles.chip, { backgroundColor: bg, borderColor: tone === "neutral" && !active ? colors.line : "transparent" }]}>
+      <Text style={[styles.chipText, { color: fg }]}>{label}</Text>
+    </View>
   );
+  return onPress ? <Pressable onPress={onPress}>{node}</Pressable> : node;
 }
 
 export function Row({
@@ -99,72 +99,78 @@ export function Row({
   green,
 }: {
   label: string;
-  value: ReactNode;
+  value: string;
   strong?: boolean;
   green?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-2.5">
-      <span className="text-[13px] text-muted">{label}</span>
-      <span
-        className={`text-right text-[13px] ${
-          green ? "text-lg font-bold text-forest" : strong ? "font-semibold text-ink" : "font-medium text-ink"
-        }`}
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.rowValue,
+          strong && { fontWeight: "600" },
+          green && { color: colors.forest, fontSize: 17, fontWeight: "700" },
+        ]}
       >
         {value}
-      </span>
-    </div>
+      </Text>
+    </View>
   );
 }
 
 export function Divider() {
-  return <div className="h-px bg-line" />;
+  return <View style={styles.divider} />;
 }
 
 export function InfoNote({ children, tone = "mint" }: { children: ReactNode; tone?: "mint" | "amber" }) {
   return (
-    <div
-      className={`flex gap-2.5 rounded-[14px] px-3.5 py-3 text-[12.5px] leading-relaxed ${
-        tone === "amber" ? "bg-amber-bg text-amber-text" : "bg-mint text-forest"
-      }`}
-    >
+    <View style={[styles.note, { backgroundColor: tone === "amber" ? colors.amberBg : colors.mint }]}>
       {children}
-    </div>
+    </View>
   );
 }
 
-export function RadioCard({
-  selected,
-  onSelect,
-  children,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`w-full rounded-[16px] border-2 bg-white p-3.5 text-left shadow-[var(--shadow-card)] ${
-        selected ? "border-forest" : "border-transparent"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-export function CheckDot({ done, current }: { done?: boolean; current?: boolean }) {
-  if (done) {
-    return (
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-forest text-white">
-        <Check size={13} strokeWidth={2.6} />
-      </span>
-    );
-  }
-  if (current) {
-    return <span className="h-6 w-6 rounded-full border-[3px] border-amber-text bg-amber-bg" />;
-  }
-  return <span className="h-6 w-6 rounded-full border-2 border-line bg-white" />;
-}
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    ...shadow,
+  },
+  cardSelected: {
+    borderWidth: 2,
+    borderColor: colors.forest,
+  },
+  primary: {
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: colors.forest,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryText: { color: colors.white, fontSize: 15, fontWeight: "600" },
+  outline: {
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    flex: 1,
+  },
+  outlineText: { fontSize: 15, fontWeight: "600" },
+  chip: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 12, fontWeight: "500" },
+  row: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 10 },
+  rowLabel: { fontSize: 13, color: colors.muted, flex: 1 },
+  rowValue: { fontSize: 13, color: colors.ink, fontWeight: "500", textAlign: "right", flex: 1 },
+  divider: { height: 1, backgroundColor: colors.line },
+  note: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", gap: 10 },
+});
