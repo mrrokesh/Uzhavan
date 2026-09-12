@@ -6,10 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#FAF6F0"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.uzhavan.buyer"
@@ -19,6 +15,17 @@
       "adaptiveIcon": {
         "backgroundColor": "#1B5E3B"
       }
-    }
+    },
+    "plugins": [
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FAF6F0"
+        }
+      ],
+      "expo-secure-store"
+    ]
   }
 }

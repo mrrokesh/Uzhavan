@@ -1,5 +1,14 @@
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState, type ReactNode } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+  type TextInputProps,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, shadow } from "../theme";
 
@@ -25,15 +34,71 @@ export function PrimaryButton({
   label,
   onPress,
   disabled,
+  loading,
 }: {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  loading?: boolean;
 }) {
+  const off = disabled || loading;
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.primary, disabled && { opacity: 0.4 }]}>
-      <Text style={styles.primaryText}>{label}</Text>
+    <Pressable onPress={onPress} disabled={off} style={[styles.primary, off && { opacity: 0.4 }]}>
+      {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{label}</Text>}
     </Pressable>
+  );
+}
+
+export function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize = "sentences",
+  autoComplete,
+  textContentType,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+  autoComplete?: TextInputProps["autoComplete"];
+  textContentType?: TextInputProps["textContentType"];
+  multiline?: boolean;
+}) {
+  const [hidden, setHidden] = useState(!!secureTextEntry);
+  return (
+    <View style={styles.field}>
+      {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
+      <View style={[styles.fieldBox, multiline && styles.fieldBoxTall]}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.faint}
+          secureTextEntry={secureTextEntry ? hidden : false}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
+          autoCorrect={!secureTextEntry}
+          multiline={multiline}
+          numberOfLines={multiline ? 4 : 1}
+          style={[styles.fieldInput, multiline && styles.fieldInputTall]}
+        />
+        {secureTextEntry ? (
+          <Pressable onPress={() => setHidden((h) => !h)} hitSlop={8}>
+            <Ionicons name={hidden ? "eye-outline" : "eye-off-outline"} size={18} color={colors.faint} />
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -173,4 +238,19 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 13, color: colors.ink, fontWeight: "500", textAlign: "right", flex: 1 },
   divider: { height: 1, backgroundColor: colors.line },
   note: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", gap: 10 },
+  field: { gap: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: "600", color: colors.muted },
+  fieldBox: {
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    ...shadow,
+  },
+  fieldInput: { flex: 1, fontSize: 15, color: colors.ink, paddingVertical: 12 },
+  fieldBoxTall: { alignItems: "flex-start", minHeight: 104 },
+  fieldInputTall: { minHeight: 84, textAlignVertical: "top" },
 });
