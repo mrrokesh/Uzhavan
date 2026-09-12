@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Logo } from "../components/Logo";
 import { Screen } from "../components/Chrome";
 import { Chip, OutlineButton } from "../components/ui";
+import { ProfileLinks } from "../components/ProfileLinks";
 import { useMe, useOrders, useRequests } from "../api/hooks";
 import { BOOKING_LABEL, REQUEST_LABEL, type RequestStatus } from "../api/types";
 import { useAuth } from "../context/AuthContext";
@@ -186,6 +187,8 @@ export function Profile() {
           <InfoRow icon="mail-outline" title={profile?.email ?? "—"} sub="Sign-in email" />
           <InfoRow icon="language-outline" title="Language" sub="English · தமிழ் ready" last />
         </View>
+
+        <ProfileLinks />
 
         <View style={styles.stats}>
           <Stat n={String(following.length)} l="Following" />

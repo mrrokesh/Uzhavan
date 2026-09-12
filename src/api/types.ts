@@ -386,3 +386,109 @@ export function tripStepIndex(status: BookingStatus): number {
   const i = TRIP_STEPS.findIndex((s) => s.status === status);
   return i; // -1 for PENDING / PAID / CANCELLED
 }
+
+// ---- Verification (KYC) ----------------------------------------------------
+
+export type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
+
+export type DocumentType =
+  | "FARMER_CARD"
+  | "LAND_RECORD"
+  | "GST_CERTIFICATE"
+  | "MSME_CERTIFICATE"
+  | "PAN_CARD"
+  | "OTHER";
+
+export type VerificationState = {
+  status: VerificationStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  idLast4: string | null;
+  hasGstin: boolean;
+  hasUdyam: boolean;
+  hasFarmerCard: boolean;
+  documents: {
+    id: string;
+    type: DocumentType;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+    uploadedAt: string;
+  }[];
+  required: { identifier: "farmerCard" | "gstinOrUdyam"; documents: DocumentType[] };
+};
+
+export type UploadDoc = {
+  type: DocumentType;
+  filename: string;
+  mimeType: string;
+  data: string;
+};
+
+// ---- Support tickets -------------------------------------------------------
+
+export type TicketStatus =
+  | "OPEN"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "WAITING_ON_USER"
+  | "RESOLVED"
+  | "CLOSED";
+
+export type TicketCategory =
+  | "ORDER"
+  | "PAYMENT"
+  | "DELIVERY"
+  | "ACCOUNT"
+  | "VERIFICATION"
+  | "APP_ISSUE"
+  | "OTHER";
+
+export type Ticket = {
+  id: string;
+  code: string;
+  category: TicketCategory;
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  status: TicketStatus;
+  subject: string;
+  orderCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  assignedTo: { id: string; name: string } | null;
+  _count?: { messages: number };
+};
+
+export type TicketThread = Ticket & {
+  raisedBy: { id: string; name: string };
+  messages: {
+    id: string;
+    body: string;
+    internal: boolean;
+    createdAt: string;
+    author: { id: string; name: string; role: Role };
+  }[];
+};
+
+export const TICKET_LABEL: Record<TicketStatus, string> = {
+  OPEN: "Waiting for support",
+  ASSIGNED: "With our team",
+  IN_PROGRESS: "Being looked at",
+  WAITING_ON_USER: "Awaiting your reply",
+  RESOLVED: "Resolved",
+  CLOSED: "Closed",
+};
+
+// ---- App config ------------------------------------------------------------
+
+export type AppConfig = {
+  support: { email: string; phone: string; whatsapp: string | null; hours: string | null };
+  update: {
+    action: "ok" | "soft" | "force";
+    latestVersion: string | null;
+    minSupportedVersion: string | null;
+    releaseNotes: string | null;
+    storeUrl: string | null;
+  };
+};

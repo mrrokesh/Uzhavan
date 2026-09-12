@@ -59,6 +59,7 @@ export function Field({
   autoCapitalize = "sentences",
   autoComplete,
   textContentType,
+  multiline,
 }: {
   label: string;
   value: string;
@@ -69,12 +70,13 @@ export function Field({
   autoCapitalize?: TextInputProps["autoCapitalize"];
   autoComplete?: TextInputProps["autoComplete"];
   textContentType?: TextInputProps["textContentType"];
+  multiline?: boolean;
 }) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.fieldBox}>
+      {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
+      <View style={[styles.fieldBox, multiline && styles.fieldBoxTall]}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -86,7 +88,9 @@ export function Field({
           autoComplete={autoComplete}
           textContentType={textContentType}
           autoCorrect={!secureTextEntry}
-          style={styles.fieldInput}
+          multiline={multiline}
+          numberOfLines={multiline ? 4 : 1}
+          style={[styles.fieldInput, multiline && styles.fieldInputTall]}
         />
         {secureTextEntry ? (
           <Pressable onPress={() => setHidden((h) => !h)} hitSlop={8}>
@@ -247,4 +251,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   fieldInput: { flex: 1, fontSize: 15, color: colors.ink, paddingVertical: 12 },
+  fieldBoxTall: { alignItems: "flex-start", minHeight: 104 },
+  fieldInputTall: { minHeight: 84, textAlignVertical: "top" },
 });

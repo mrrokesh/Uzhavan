@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./src/context/AuthContext";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { UpdateGate } from "./src/components/UpdateGate";
 import { ApiError } from "./src/lib/api";
 
 /**
@@ -32,10 +33,12 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </AuthProvider>
+          <UpdateGate>
+            <AuthProvider>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </AuthProvider>
+          </UpdateGate>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
