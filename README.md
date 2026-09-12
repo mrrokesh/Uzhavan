@@ -113,7 +113,8 @@ Set `ADMIN_PASSWORD` in `server/.env` before going live and the seed uses that f
 7. **Delivery needs proof.** A driver cannot close a trip without recording who received the crop.
 8. **Farmers and drivers are never charged.** No commission, no platform fee. The fee is added on top of the price the farmer agreed and paid by the buyer, so a farmer's payout is exactly the number they accepted.
 9. **A farmer's advance is released by the driver, not the farmer.** A farmer saying they shipped is not evidence that they shipped.
-10. **A paid badge is never an identity badge.** *ID Verified* is free and document-backed; *Uzhavan Plus* is a paid subscription with its own separate badge. Selling a trust mark would let a fraudster buy credibility for the price of a subscription.
+10. **You can only rate someone you traded with**, once, after the crop arrived — and all three parties rate each other, not just the customer.
+11. **A paid badge is never an identity badge.** *ID Verified* is free and document-backed; *Uzhavan Plus* is a paid subscription with its own separate badge. Selling a trust mark would let a fraudster buy credibility for the price of a subscription.
 
 ---
 
@@ -265,7 +266,7 @@ Mode is read from the key id rather than asked for, so `rzp_live_` can't be misl
 
 Buyer checkout runs Razorpay's hosted page in a WebView. Their React Native SDK is a native module and can't run in Expo Go; the hosted page is the same code path, holds no secret, and the server recomputes the signature before believing any of it.
 
-**Uzhavan Plus** is ₹499 for 12 months, renewals extend rather than reset.
+**Uzhavan Plus** is ₹499 for 12 months, renewals extend rather than reset — but it currently buys nothing. There is a price and a payment path and no benefits attached, which is why no screen sells it: shipping that would be selling nothing. It exists as a deliberately separate tier so a paid badge can never be mistaken for a document-backed one; deciding what it should actually include is an open product question.
 
 
 ---
@@ -331,7 +332,7 @@ Tabs: **Home · My Crops · Requests · Profile**
 **Driver** — job board with online toggle · my trips · trip detail with the status stepper · profile & truck settings
 Tabs: **Jobs · My Trips · Profile**
 
-**Shared** — sign in · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · wrong-app · reconnect
+**Shared** — sign in · **forgot password** · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · wrong-app · reconnect
 
 ---
 
