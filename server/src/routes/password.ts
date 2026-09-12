@@ -7,6 +7,7 @@ import { env } from "../env.js";
 import { notify } from "../notify.js";
 import { audit } from "../audit.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { LIMITS, enforce } from "../ratelimit.js";
 
 export const passwordRouter = Router();
 
@@ -45,7 +46,11 @@ const forgotBody = z.object({
 passwordRouter.post(
   "/forgot",
   asyncHandler(async (req, res) => {
+    // Each of these costs an SMS and an email. Limited per address, and again
+    // per target account so one mailbox can't be flooded from many addresses.
+    enforce(req, "forgot", LIMITS.forgot);
     const { email } = forgotBody.parse(req.body);
+    enforce(req, "forgot-target", LIMITS.forgotTarget, email);
     const generic = {
       sent: true,
       message: "If that account exists, a code is on its way. It expires in 15 minutes.",
@@ -94,6 +99,7 @@ const resetBody = z.object({
 passwordRouter.post(
   "/reset",
   asyncHandler(async (req, res) => {
+    enforce(req, "reset", LIMITS.resetAttempt);
     const { email, code, password } = resetBody.parse(req.body);
 
     const user = await prisma.user.findUnique({ where: { email } });

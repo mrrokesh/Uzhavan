@@ -89,20 +89,54 @@ export async function requireDriver(req: Request) {
   return { user, driver };
 }
 
-/** Strip secrets and encrypted blobs before a user object leaves the server. */
-export function publicUser(user: User) {
-  const {
-    passwordHash: _pw,
-    gstinEnc: _g,
-    gstinIndex: _gi,
-    udyamEnc: _u,
-    udyamIndex: _ui,
-    panEnc: _p,
-    farmerCardEnc: _f,
-    farmerCardIndex: _fi,
-    ...rest
-  } = user;
-  return rest;
+/**
+ * What a user object looks like once it leaves the server.
+ *
+ * An allowlist, deliberately. This was a denylist of secrets to strip, and it
+ * failed exactly the way denylists do: `licenceEnc` and `licenceIndex` were
+ * added to the schema months later, nobody thought to add them here, and the
+ * driver's encrypted licence and its blind index went out to every client. The
+ * ciphertext is AES-GCM and not readable, but a blind index is a deterministic
+ * HMAC — hand someone that and they can test candidate licence numbers offline
+ * against a small, well-structured space until one matches.
+ *
+ * Listing what may leave means a new column is invisible until somebody
+ * decides otherwise. Forgetting is then a missing field in the app, which
+ * someone notices, rather than a silent leak, which nobody does.
+ */
+const PUBLIC_FIELDS = [
+  "id",
+  "email",
+  "role",
+  "name",
+  "phone",
+  "avatarKey",
+  "business",
+  "district",
+  "districtKey",
+  "warehouse",
+  "warehouseAddress",
+  "market",
+  "status",
+  "statusReason",
+  "verification",
+  "verificationSubmittedAt",
+  "verificationReviewedAt",
+  "rejectionReason",
+  // Last four of whichever identifier they verified with — kept so the owner
+  // recognises it. Never the identifier itself.
+  "idLast4",
+  "plusUntil",
+  "permissions",
+  "createdAt",
+] as const satisfies readonly (keyof User)[];
+
+export type PublicUser = Pick<User, (typeof PUBLIC_FIELDS)[number]>;
+
+export function publicUser(user: User): PublicUser {
+  const out = {} as Record<string, unknown>;
+  for (const field of PUBLIC_FIELDS) out[field] = user[field];
+  return out as PublicUser;
 }
 
 /** Human-readable reference codes: UZH-REQ-7F3K2 etc. */

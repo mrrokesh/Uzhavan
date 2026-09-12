@@ -175,6 +175,9 @@ Flow is `UNVERIFIED → PENDING → VERIFIED / REJECTED`, with a staff review qu
 - **At rest**: AES-256-GCM over GSTIN, Udyam, PAN, farmer card, driving licence and every uploaded document. Deterministic **blind indexes** enforce "this GSTIN is already registered" without storing the plaintext.
 - **Documents** live in their own table so a multi-megabyte blob never enters an ordinary query, and are owner-or-reviewer only — a stranger gets a 404, not a 403.
 - **Password reset** is a six-digit code, not a link — it arrives over SMS as readily as email, and a farmer with one phone can read it and type it without leaving the app. Only a SHA-256 of the code is stored, it dies after 15 minutes or five wrong guesses, asking again kills the previous one, and a used code can't be replayed. The reply is identical whether or not the account exists, because otherwise this becomes a tool for discovering which of a list of emails are registered — on a marketplace, that's a list of a competitor's suppliers. Blocked accounts are never issued one.
+- **Guessing is bounded.** Five consecutive failed sign-ins freeze an account for a minute, then five, then thirty — progressive, and always expiring. A permanent lock would hand anyone a way to freeze a competitor out of their own account by failing their password enough times.
+- **Per-IP limits are an abuse ceiling, not the defence.** Carrier-grade NAT is the norm on Indian mobile networks, so one address can be thousands of unrelated people; a tight per-IP limit doesn't stop an attacker with a phone, it locks out a whole carrier. The real protection is per-account. Reset requests are additionally capped per *target* account, because each one costs a real person an SMS.
+- **A user object is an allowlist**, not a list of secrets to strip. It used to be the latter, and it failed exactly as denylists do — `licenceEnc` and `licenceIndex` were added to the schema later, nobody updated the strip list, and a driver's encrypted licence and its blind index went out to every client. A blind index is a deterministic HMAC: hand one over and candidate licence numbers can be tested offline until one matches. Listing what may leave means a new column is invisible until somebody decides otherwise, and a test asserts every secret column stays out.
 - **Blocking** is immediate: a token already issued stops working on the next request, a blocked driver goes offline, a blocked farmer's listings leave the marketplace.
 - **Payments**: amounts are decided server-side, signatures compared in constant time, webhook mounted before the JSON parser because Razorpay signs the exact bytes.
 - **Audit log** is append-only, with actor and before/after values on every privileged action.
@@ -384,7 +387,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by nine end-to-end suites — **401 assertions** — run against a live server and a real database:
+The API is covered by ten end-to-end suites — **425 assertions** — run against a live server and a real database:
 
 ```bash
 cd server
@@ -404,6 +407,7 @@ npm test             # in another
 | `suggest` (22) | Interest signals moving the ranking, exclusions, cold start, honest reasons |
 | `password` (22) | Reset codes, account enumeration, replay, guess limits, expiry, blocked accounts |
 | `push` (21) | Device registration, re-use by a new account, audience targeting, exclusions |
+| `limits` (24) | Account lockout and its expiry, flood protection, what a user object may contain |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 
