@@ -57,10 +57,13 @@ export function Layout() {
             </NavLink>
           )}
           {can("USERS_VIEW") && <NavLink to="/accounts">Accounts</NavLink>}
+          {can("ORDERS_VIEW") && <NavLink to="/tracking">Track a vehicle</NavLink>}
 
           <div className="nav-section">Platform</div>
           <NavLink to="/settings">Settings</NavLink>
+          {can("CONFIG_WRITE") && <NavLink to="/announcements">Announcements</NavLink>}
           <NavLink to="/releases">App updates</NavLink>
+          {session?.isAdmin && <NavLink to="/payments">Payments</NavLink>}
           {can("ADMIN_STAFF_MANAGE") && <NavLink to="/staff">Staff</NavLink>}
           {can("ADMIN_AUDIT_VIEW") && <NavLink to="/audit">Audit log</NavLink>}
         </nav>

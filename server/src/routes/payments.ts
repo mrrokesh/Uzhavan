@@ -412,7 +412,14 @@ export function registerGatewayRoutes(
       const target = await prisma.paymentGateway.findUnique({ where: { id } });
       if (!target) throw new HttpError(404, "No such account");
       if (target.active) {
-        throw new HttpError(409, "Activate another account before removing this one");
+        // Refusing outright would trap an admin who added one account with a
+        // typo'd key: it's active, it's the only one, and "activate another
+        // first" is impossible. Removing the last one leaves no gateway, which
+        // is the state they started in — checkout says so plainly.
+        const others = await prisma.paymentGateway.count({ where: { id: { not: id } } });
+        if (others > 0) {
+          throw new HttpError(409, "Activate another account before removing this one");
+        }
       }
       const used = await prisma.payment.count({ where: { gatewayId: id } });
       if (used > 0) {
