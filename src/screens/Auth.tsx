@@ -16,6 +16,7 @@ import { Logo } from "../components/Logo";
 import { Field, PrimaryButton } from "../components/ui";
 import { useAuth, type RegisterInput } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
+import { APP_NAME, APP_ROLES, IS_BUYER_APP, OTHER_APP_NAME } from "../lib/appInfo";
 import type { AuthStackParamList } from "../navigation/types";
 import type { Role } from "../api/types";
 import { colors, shadow } from "../theme";
@@ -25,11 +26,14 @@ function errorMessage(err: unknown) {
   return "Couldn’t reach the server. Check that the API is running.";
 }
 
-const ROLES: { role: Role; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }[] = [
+const ALL_ROLES: { role: Role; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }[] = [
   { role: "BUYER", icon: "storefront-outline", title: "I buy crops", sub: "Wholesale buyer or trader" },
   { role: "FARMER", icon: "leaf-outline", title: "I sell crops", sub: "Farmer listing a harvest" },
   { role: "DRIVER", icon: "car-outline", title: "I drive a truck", sub: "Move crops farm to warehouse" },
 ];
+
+/** Only the roles this build serves. Uzhavan Buy offers one, so it skips the picker. */
+const ROLES = ALL_ROLES.filter((r) => APP_ROLES.includes(r.role));
 
 export function Login() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
@@ -61,7 +65,11 @@ export function Login() {
         <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           <Logo />
           <Text style={styles.h1}>Welcome back</Text>
-          <Text style={styles.lead}>Buy, sell, or move crops across Tamil Nadu.</Text>
+          <Text style={styles.lead}>
+            {IS_BUYER_APP
+              ? "Buy direct from Tamil Nadu farms."
+              : "Sell your harvest, or haul it, across Tamil Nadu."}
+          </Text>
 
           <View style={styles.form}>
             <Field
@@ -88,11 +96,24 @@ export function Login() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable onPress={() => navigation.navigate("ChooseRole")} style={styles.switch}>
+          <Pressable
+            onPress={() =>
+              ROLES.length === 1
+                ? navigation.navigate("CreateAccount", { role: ROLES[0].role })
+                : navigation.navigate("ChooseRole")
+            }
+            style={styles.switch}
+          >
             <Text style={styles.switchText}>
               New here? <Text style={styles.link}>Create an account</Text>
             </Text>
           </Pressable>
+
+          <Text style={styles.otherApp}>
+            {IS_BUYER_APP
+              ? `Farmer or truck driver? Use the ${OTHER_APP_NAME} app instead.`
+              : `Buying in bulk? Use the ${OTHER_APP_NAME} app instead.`}
+          </Text>
         </ScrollView>
       </Screen>
     </KeyboardAvoidingView>
@@ -106,7 +127,7 @@ export function ChooseRole() {
     <Screen>
       <AppHeader title="Create account" />
       <ScrollView contentContainerStyle={styles.pad}>
-        <Text style={styles.h1}>How will you use Uzhavan?</Text>
+        <Text style={styles.h1}>How will you use {APP_NAME}?</Text>
         <Text style={styles.lead}>Pick the one that fits. You can’t change this later.</Text>
 
         <View style={{ marginTop: 24, gap: 12 }}>
@@ -328,6 +349,13 @@ const styles = StyleSheet.create({
   switch: { marginTop: 20, alignItems: "center" },
   switchText: { fontSize: 14, color: colors.muted },
   link: { color: colors.forest, fontWeight: "600" },
+  otherApp: {
+    marginTop: 28,
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.faint,
+  },
   roleCard: {
     flexDirection: "row",
     alignItems: "center",
