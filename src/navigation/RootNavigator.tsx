@@ -8,6 +8,9 @@ import { AppProvider } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
 
 import { ChooseRole, CreateAccount, Login } from "../screens/Auth";
+import { WrongApp } from "../screens/WrongApp";
+import { Reconnect } from "../screens/Reconnect";
+import { servesRole } from "../lib/appInfo";
 
 // Buyer
 import { BookTruckOrder, ConfirmPurchase, QuantityConfirmed } from "../screens/AcceptFlow";
@@ -217,14 +220,20 @@ function BootSplash() {
 }
 
 export function RootNavigator() {
-  const { ready, token, role } = useAuth();
+  const { ready, offline, token, role } = useAuth();
 
   return (
     <NavigationContainer theme={theme}>
       {!ready ? (
         <BootSplash />
+      ) : offline ? (
+        // Saved session we couldn't confirm. Not a logout — offer a retry.
+        <Reconnect />
       ) : !token ? (
         <AuthStack />
+      ) : !servesRole(role) ? (
+        // A valid account, but for the other app — or for the web console.
+        <WrongApp />
       ) : role === "FARMER" ? (
         <FarmerApp />
       ) : role === "DRIVER" ? (

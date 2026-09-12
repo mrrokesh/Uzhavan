@@ -4,10 +4,13 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "cross-env UZHAVAN_APP=farmer expo start --port 8082",
+    "start:buy": "cross-env UZHAVAN_APP=buy expo start --port 8083",
+    "android": "cross-env UZHAVAN_APP=farmer expo start --android --port 8082",
+    "android:buy": "cross-env UZHAVAN_APP=buy expo start --android --port 8083",
+    "ios": "cross-env UZHAVAN_APP=farmer expo start --ios --port 8082",
+    "ios:buy": "cross-env UZHAVAN_APP=buy expo start --ios --port 8083",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -33,6 +36,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@types/react": "~19.2.4",
+    "cross-env": "^10.1.0",
     "typescript": "~6.0.3"
   }
 }
