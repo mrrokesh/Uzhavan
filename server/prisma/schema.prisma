@@ -260,6 +260,12 @@ model User {
   /// Last 4 characters, kept in the clear purely so the owner recognises it.
   idLast4         String?
 
+  /// Consecutive failed sign-ins. Reset by any success. Drives a progressive,
+  /// always-expiring lockout — see src/ratelimit.ts.
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
+  lastLoginAt  DateTime?
+
   /// Uzhavan Plus — a paid subscription, deliberately separate from KYC.
   /// A paid badge must never be mistaken for "we checked who this is".
   plusUntil DateTime?

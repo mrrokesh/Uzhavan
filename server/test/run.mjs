@@ -31,6 +31,7 @@ const SUITES = [
   ["suggest", "Interest signals, ranking, exclusions, cold start"],
   ["password", "Reset codes, enumeration, replay, guess limits, expiry"],
   ["push", "Device registration, re-use, audience targeting"],
+  ["limits", "Account lockout, flood protection, what a user object may contain"],
 ];
 
 const run = (name) =>
