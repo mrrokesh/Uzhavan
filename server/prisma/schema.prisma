@@ -277,6 +277,7 @@ model User {
   saves    SavedCrop[]
 
   payments          Payment[]
+  passwordResets    PasswordReset[]
   linkedAccount     LinkedAccount?
   payouts           Payout[]           @relation("PayoutFarmer")
   payoutOverrides   Payout[]           @relation("PayoutOverride")
@@ -473,6 +474,29 @@ model Payment {
 /// A farmer's Razorpay Route account. Buyer money never sits in our own
 /// current account — RBI's payment-aggregator rules don't allow that — so the
 /// gateway holds it and we tell it when to let go.
+/// A one-time code for getting back into an account.
+///
+/// The code itself is never stored — only a SHA-256 of it — so a leak of this
+/// table hands nobody a way in. Attempts are counted because a six-digit code
+/// is guessable if you're allowed to keep guessing.
+model PasswordReset {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  /// Where it was sent, for support to answer "did it go out?".
+  sentTo    String
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model LinkedAccount {
   id     String @id @default(cuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

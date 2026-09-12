@@ -174,6 +174,7 @@ Flow is `UNVERIFIED → PENDING → VERIFIED / REJECTED`, with a staff review qu
 - **Passwords**: bcrypt at cost 12 over an HMAC-SHA256 **pepper** held only in the environment. A stolen database is not crackable offline. Hashes are version-tagged and silently re-hashed at next login, so the pepper or cost can be rotated without resetting anyone's password.
 - **At rest**: AES-256-GCM over GSTIN, Udyam, PAN, farmer card, driving licence and every uploaded document. Deterministic **blind indexes** enforce "this GSTIN is already registered" without storing the plaintext.
 - **Documents** live in their own table so a multi-megabyte blob never enters an ordinary query, and are owner-or-reviewer only — a stranger gets a 404, not a 403.
+- **Password reset** is a six-digit code, not a link — it arrives over SMS as readily as email, and a farmer with one phone can read it and type it without leaving the app. Only a SHA-256 of the code is stored, it dies after 15 minutes or five wrong guesses, asking again kills the previous one, and a used code can't be replayed. The reply is identical whether or not the account exists, because otherwise this becomes a tool for discovering which of a list of emails are registered — on a marketplace, that's a list of a competitor's suppliers. Blocked accounts are never issued one.
 - **Blocking** is immediate: a token already issued stops working on the next request, a blocked driver goes offline, a blocked farmer's listings leave the marketplace.
 - **Payments**: amounts are decided server-side, signatures compared in constant time, webhook mounted before the JSON parser because Razorpay signs the exact bytes.
 - **Audit log** is append-only, with actor and before/after values on every privileged action.
@@ -202,6 +203,19 @@ Four are **admin-only and structurally non-delegable** — create/remove staff, 
 | **Payments** | Razorpay accounts, swappable in a click if one is blocked |
 | **Staff** | Create, scope permissions, remove |
 | **Audit log** | Every privileged action, append-only |
+
+---
+
+## Getting messages to people
+
+Two channels, each with a driver chosen by environment, and both defaulting to **`log`** — which prints the message to the server console instead of sending it. The whole password-reset flow therefore works on a laptop with no accounts anywhere, and a missing credential shows up as a visible log line rather than a message that silently never arrives.
+
+| Channel | Drivers |
+| --- | --- |
+| Email | `log` · `smtp` (any SMTP URL) |
+| SMS | `log` · `msg91` |
+
+In production the server **refuses to boot** with both on `log`, because a locked-out farmer would have no way back in. Delivery never throws into a request — nobody should see a 500 because an SMTP host is slow — and both channels are tried, since we don't know which one a given farmer actually reads.
 
 ---
 
@@ -299,7 +313,7 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 
 | Area | Routes |
 | --- | --- |
-| Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` |
+| Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` · `POST /auth/password/forgot｜reset` |
 | Profile | `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
 | Suggestions | `GET /crops/suggested?limit=` |
 | Browse | `GET /crops` (`status` `q` `farmId` `following` `district` `radiusKm` `verifiedOnly` `category` `minPrice` `maxPrice` `sort`) · `GET /crops/:id` · `GET /crops/districts` |
@@ -365,7 +379,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by seven end-to-end suites — **358 assertions** — run against a live server and a real database:
+The API is covered by eight end-to-end suites — **380 assertions** — run against a live server and a real database:
 
 ```bash
 cd server
@@ -383,6 +397,7 @@ npm test             # in another
 | `feat` (96) | Announcement audiences, demand privacy, driver verification, gateway switching, plate lookup |
 | `payout` (41) | Platform fee floor and ceiling, escrow scheduling, payout policy, overrides |
 | `suggest` (22) | Interest signals moving the ranking, exclusions, cold start, honest reasons |
+| `password` (22) | Reset codes, account enumeration, replay, guess limits, expiry, blocked accounts |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 

@@ -96,6 +96,10 @@ export function Login() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
+          <Pressable onPress={() => navigation.navigate("ForgotPassword")} style={styles.forgot}>
+            <Text style={styles.forgotText}>Forgot your password?</Text>
+          </Pressable>
+
           <Pressable
             onPress={() =>
               ROLES.length === 1
@@ -349,6 +353,8 @@ const styles = StyleSheet.create({
   switch: { marginTop: 20, alignItems: "center" },
   switchText: { fontSize: 14, color: colors.muted },
   link: { color: colors.forest, fontWeight: "600" },
+  forgot: { marginTop: 16, alignItems: "center" },
+  forgotText: { fontSize: 13, fontWeight: "600", color: colors.forest },
   otherApp: {
     marginTop: 28,
     textAlign: "center",

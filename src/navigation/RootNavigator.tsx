@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 
 import { ChooseRole, CreateAccount, Login } from "../screens/Auth";
 import { WrongApp } from "../screens/WrongApp";
+import { ForgotPassword } from "../screens/ForgotPassword";
 import { Reconnect } from "../screens/Reconnect";
 import { servesRole } from "../lib/appInfo";
 
@@ -216,6 +217,7 @@ function AuthStack() {
       <AuthStackNav.Screen name="Login" component={Login} />
       <AuthStackNav.Screen name="ChooseRole" component={ChooseRole} />
       <AuthStackNav.Screen name="CreateAccount" component={CreateAccount} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPassword} />
     </AuthStackNav.Navigator>
   );
 }

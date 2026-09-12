@@ -15,6 +15,7 @@ export type AuthStackParamList = {
   Login: undefined;
   ChooseRole: undefined;
   CreateAccount: { role: Role };
+  ForgotPassword: undefined;
 };
 
 // ---- Buyer -----------------------------------------------------------------
