@@ -214,8 +214,13 @@ Two channels, each with a driver chosen by environment, and both defaulting to *
 | --- | --- |
 | Email | `log` · `smtp` (any SMTP URL) |
 | SMS | `log` · `msg91` |
+| Push | Expo, no configuration |
 
-In production the server **refuses to boot** with both on `log`, because a locked-out farmer would have no way back in. Delivery never throws into a request — nobody should see a 500 because an SMTP host is slow — and both channels are tried, since we don't know which one a given farmer actually reads.
+**Push** goes through Expo, so there are no APNs certificates to rotate and no per-platform code. Publishing an announcement sends to everyone it targets, skipping suspended and blocked accounts — someone who can't use the app shouldn't be pinged about it. Editing an already-published notice doesn't buzz anyone a second time; only the draft-to-live transition does. Tokens Expo reports as dead are deleted rather than retried forever, and a handset that changes hands follows the new account.
+
+A push is a courtesy on top of an action that already succeeded: the announcement is saved and shows on the bell whether or not any notification lands, and the send isn't awaited so an admin never waits on a push service.
+
+In production the server **refuses to boot** with both email and SMS on `log`, because a locked-out farmer would have no way back in. Delivery never throws into a request — nobody should see a 500 because an SMTP host is slow — and both channels are tried, since we don't know which one a given farmer actually reads.
 
 ---
 
@@ -314,7 +319,7 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | Area | Routes |
 | --- | --- |
 | Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` · `POST /auth/password/forgot｜reset` |
-| Profile | `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
+| Profile | `PUT/DELETE /me/push-token` · `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
 | Suggestions | `GET /crops/suggested?limit=` |
 | Browse | `GET /crops` (`status` `q` `farmId` `following` `district` `radiusKm` `verifiedOnly` `category` `minPrice` `maxPrice` `sort`) · `GET /crops/:id` · `GET /crops/districts` |
 | Verification | `GET/POST /verification` · `GET /verification/documents/:id` · `GET /verification/queue` · `POST /verification/queue/:userId` |
@@ -379,7 +384,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by eight end-to-end suites — **380 assertions** — run against a live server and a real database:
+The API is covered by nine end-to-end suites — **401 assertions** — run against a live server and a real database:
 
 ```bash
 cd server
@@ -398,6 +403,7 @@ npm test             # in another
 | `payout` (41) | Platform fee floor and ceiling, escrow scheduling, payout policy, overrides |
 | `suggest` (22) | Interest signals moving the ranking, exclusions, cold start, honest reasons |
 | `password` (22) | Reset codes, account enumeration, replay, guess limits, expiry, blocked accounts |
+| `push` (21) | Device registration, re-use by a new account, audience targeting, exclusions |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 

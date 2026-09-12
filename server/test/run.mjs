@@ -30,6 +30,7 @@ const SUITES = [
   ["payout", "Platform fee, escrow scheduling, payout policy and overrides"],
   ["suggest", "Interest signals, ranking, exclusions, cold start"],
   ["password", "Reset codes, enumeration, replay, guess limits, expiry"],
+  ["push", "Device registration, re-use, audience targeting"],
 ];
 
 const run = (name) =>

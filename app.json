@@ -21,7 +21,13 @@
           "backgroundColor": "#FAF6F0"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#1B5E3B"
+        }
+      ]
     ]
   }
 }

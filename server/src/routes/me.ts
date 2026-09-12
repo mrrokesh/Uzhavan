@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { currentUser, publicUser, requireRole } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { isExpoPushToken } from "../push.js";
 import { resolveDistrict } from "../data/districts.js";
 
 export const meRouter = Router();
@@ -111,5 +112,56 @@ meRouter.delete(
     });
     const rows = await prisma.savedCrop.findMany({ where: { userId: user.id } });
     res.json({ saved: rows.map((s) => s.cropId) });
+  }),
+);
+
+// ---- Push registration ------------------------------------------------------
+
+const tokenBody = z.object({
+  token: z.string().trim().refine(isExpoPushToken, "That isn't an Expo push token"),
+  platform: z.enum(["ANDROID", "IOS"]),
+  app: z.enum(["BUYER", "PARTNER"]).default("BUYER"),
+});
+
+/**
+ * Register this install for notifications.
+ *
+ * Upsert on the token, not on the user: one person may have a phone and a
+ * tablet, or both apps on one device. Re-registering also refreshes lastSeen,
+ * which is how a token that has quietly stopped being used can be pruned later.
+ *
+ * The token is reassigned to whoever is signed in now — the same handset can
+ * change hands, and notices must follow the account rather than the device.
+ */
+meRouter.put(
+  "/push-token",
+  asyncHandler(async (req, res) => {
+    const user = await currentUser(req);
+    const body = tokenBody.parse(req.body);
+
+    await prisma.pushToken.upsert({
+      where: { token: body.token },
+      create: {
+        token: body.token,
+        userId: user.id,
+        platform: body.platform,
+        app: body.app,
+      },
+      update: { userId: user.id, platform: body.platform, app: body.app, lastSeen: new Date() },
+    });
+
+    res.json({ registered: true });
+  }),
+);
+
+/** Signing out should stop the notifications too. */
+meRouter.delete(
+  "/push-token/:token",
+  asyncHandler(async (req, res) => {
+    const user = await currentUser(req);
+    await prisma.pushToken.deleteMany({
+      where: { token: String(req.params.token), userId: user.id },
+    });
+    res.json({ removed: true });
   }),
 );
