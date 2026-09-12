@@ -148,6 +148,15 @@ export type ApiRequest = {
   quantityKg: number;
   estimatedValue: number;
   finalPricePerKg: number | null;
+  /**
+   * What the buyer will pay if they confirm. Computed live, because the rate is
+   * only fixed onto the order once it exists. Farmers and drivers pay no fee —
+   * `goodsValue` is the farmer's money and it is never reduced by `platformFee`.
+   */
+  goodsValue?: number;
+  feeBps?: number;
+  platformFee?: number;
+  totalPayable?: number;
   declineReason: string | null;
   status: RequestStatus;
   createdAt: string;
@@ -205,7 +214,13 @@ export type ApiOrder = {
   product: string;
   quantityKg: number;
   pricePerKg: number;
+  /** The farmer's money — quantity x agreed price, never reduced by the fee. */
   value: number;
+  /** The rate that applied when this order was placed, in basis points. */
+  feeBps: number;
+  platformFee: number;
+  /** value + platformFee. What the buyer paid. */
+  totalPayable: number;
   pickup: string;
   destination: string;
   harvestDate: string;
