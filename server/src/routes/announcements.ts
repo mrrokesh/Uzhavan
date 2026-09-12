@@ -6,6 +6,7 @@ import { audit } from "../audit.js";
 import { requirePermission } from "../permissions.js";
 import { currentUser } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { pushToAudience } from "../push.js";
 
 export const announcementsRouter = Router();
 
@@ -180,6 +181,17 @@ adminAnnouncementsRouter.post(
       summary: `${b.publish ? "Published" : "Drafted"} "${b.title}" to ${b.audience.toLowerCase()}`,
     });
 
+    // A draft reaches nobody, which is the point of a draft. Published ones go
+    // out to phones as well as the bell — not awaited, because the notice is
+    // already saved and the admin shouldn't wait on a push service to see that.
+    if (b.publish) {
+      void pushToAudience(b.audience, {
+        title: b.title,
+        body: b.body.length > 140 ? `${b.body.slice(0, 139)}…` : b.body,
+        data: { kind: "announcement", id: created.id },
+      }).catch((err) => console.error("[push] announcement failed:", err));
+    }
+
     res.status(201).json(created);
   }),
 );
@@ -217,6 +229,16 @@ adminAnnouncementsRouter.patch(
       targetId: id,
       summary: `Updated "${updated.title}"`,
     });
+
+    // Only on the transition from draft to live. Editing a typo in something
+    // already published must not buzz everyone's phone a second time.
+    if (!existing.publishedAt && updated.publishedAt) {
+      void pushToAudience(updated.audience, {
+        title: updated.title,
+        body: updated.body.length > 140 ? `${updated.body.slice(0, 139)}…` : updated.body,
+        data: { kind: "announcement", id: updated.id },
+      }).catch((err) => console.error("[push] announcement failed:", err));
+    }
 
     res.json(updated);
   }),

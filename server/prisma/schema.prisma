@@ -278,6 +278,7 @@ model User {
 
   payments          Payment[]
   passwordResets    PasswordReset[]
+  pushTokens        PushToken[]
   linkedAccount     LinkedAccount?
   payouts           Payout[]           @relation("PayoutFarmer")
   payoutOverrides   Payout[]           @relation("PayoutOverride")
@@ -474,6 +475,29 @@ model Payment {
 /// A farmer's Razorpay Route account. Buyer money never sits in our own
 /// current account — RBI's payment-aggregator rules don't allow that — so the
 /// gateway holds it and we tell it when to let go.
+/// Where to reach one installation of the app.
+///
+/// A person can have several — a phone and a tablet, or the buyer app and the
+/// partner app on one device — so this is a list, not a column on User. Tokens
+/// are deleted the moment Expo says the device is gone rather than retried
+/// forever.
+model PushToken {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+  token    String   @unique
+  platform Platform
+  /// Which app this install is, so a notice can target one of them.
+  app      AppKind  @default(BUYER)
+
+  createdAt DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  @@index([userId])
+}
+
 /// A one-time code for getting back into an account.
 ///
 /// The code itself is never stored — only a SHA-256 of it — so a leak of this

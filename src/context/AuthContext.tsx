@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ApiUser, AuthSession, Role } from "../api/types";
 import { ApiError, api } from "../lib/api";
 import { clearToken, loadToken, saveToken } from "../lib/session";
+import { registerForPush, unregisterPush } from "../lib/push";
 
 export type BuyerRegistration = {
   role: "BUYER";
@@ -85,11 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session.user);
       setOffline(false);
       qc.clear();
+      // Not awaited: signing in shouldn't wait on a permission dialog, and a
+      // refused one is not a failure to sign in.
+      void registerForPush();
     },
     [qc],
   );
 
   const signOut = useCallback(async () => {
+    // Before the token goes, while the call can still authenticate. The next
+    // person to use this phone must not get the last account's announcements.
+    await unregisterPush();
     await clearToken();
     setToken(null);
     setUser(null);
@@ -131,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(data.user);
           setOffline(false);
           setReady(true);
+          void registerForPush();
           return;
         } catch (err) {
           if (cancelled) return;
