@@ -7,6 +7,7 @@ import { env } from "../env.js";
 import { currentUser, publicUser } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 import { resolveDistrict } from "../data/districts.js";
+import { normalisePlate } from "../lib/plate.js";
 
 export const authRouter = Router();
 
@@ -132,6 +133,7 @@ authRouter.post(
             price: body.price,
             body: body.body,
             plate: body.plate.toUpperCase(),
+            plateKey: normalisePlate(body.plate),
             photoKey: capacityKg <= 2000 ? "miniTruck" : capacityKg >= 5000 ? "lcv" : "truck",
           },
         });

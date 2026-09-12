@@ -48,7 +48,37 @@ enum DocumentType {
   GST_CERTIFICATE
   MSME_CERTIFICATE
   PAN_CARD
+  // Driver / vehicle
+  DRIVING_LICENCE
+  VEHICLE_RC
+  VEHICLE_INSURANCE
+  VEHICLE_PERMIT
   OTHER
+}
+
+/// Who an announcement is aimed at.
+enum Audience {
+  ALL
+  FARMERS
+  BUYERS
+  DRIVERS
+}
+
+enum PaymentPurpose {
+  TRUCK_BOOKING
+  PLUS_SUBSCRIPTION
+}
+
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMode {
+  TEST
+  LIVE
 }
 
 /// Module-level rights an admin can hand to a staff member.
@@ -192,8 +222,15 @@ model User {
   panEnc          String?
   farmerCardEnc   String?
   farmerCardIndex String? @unique
+  /// Driving licence, encrypted like the other identifiers.
+  licenceEnc      String?
+  licenceIndex    String? @unique
   /// Last 4 characters, kept in the clear purely so the owner recognises it.
   idLast4         String?
+
+  /// Uzhavan Plus — a paid subscription, deliberately separate from KYC.
+  /// A paid badge must never be mistaken for "we checked who this is".
+  plusUntil DateTime?
 
   documents KycDocument[] @relation("DocumentOwner")
 
@@ -207,6 +244,9 @@ model User {
   follows  Follow[]
   saves    SavedCrop[]
 
+  payments          Payment[]
+  announcementsRead AnnouncementRead[]
+  announcementsMade Announcement[]  @relation("AnnouncementAuthor")
   ticketsRaised    Ticket[]        @relation("TicketRaiser")
   ticketsAssigned  Ticket[]        @relation("TicketAssignee")
   ticketMessages   TicketMessage[]
@@ -308,6 +348,89 @@ model AppRelease {
   updatedById String?
 
   @@unique([app, platform])
+}
+
+/// Broadcast from the admin console to one or more sides of the marketplace.
+model Announcement {
+  id       String   @id @default(cuid())
+  title    String
+  body     String
+  audience Audience @default(ALL)
+  /// Pinned announcements stay at the top until they expire.
+  pinned   Boolean  @default(false)
+
+  publishedAt DateTime?
+  expiresAt   DateTime?
+
+  author   User?   @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  authorId String?
+
+  reads AnnouncementRead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([audience, publishedAt])
+}
+
+/// One row per person who has seen an announcement, so the bell can show a
+/// genuine unread count rather than a guess.
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  announcementId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+}
+
+/// Razorpay credentials, swappable from the console so a blocked or rotated
+/// account can be replaced without a deploy. Secrets are AES-256-GCM encrypted.
+model PaymentGateway {
+  id           String      @id @default(cuid())
+  label        String
+  mode         PaymentMode @default(TEST)
+  keyId        String
+  keySecretEnc String
+  webhookSecretEnc String?
+  /// Exactly one gateway is active at a time; activating another stands this down.
+  active       Boolean     @default(false)
+
+  payments  Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
+model Payment {
+  id      String         @id @default(cuid())
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  purpose PaymentPurpose
+  status  PaymentStatus  @default(CREATED)
+
+  /// Paise, as Razorpay counts it — never floats for money.
+  amountPaise Int
+  currency    String @default("INR")
+
+  gateway   PaymentGateway? @relation(fields: [gatewayId], references: [id])
+  gatewayId String?
+  mode      PaymentMode     @default(TEST)
+
+  razorpayOrderId   String  @unique
+  razorpayPaymentId String?
+  /// What the payment was for, e.g. a booking id.
+  referenceId       String?
+  failureReason     String?
+
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+
+  @@index([userId])
+  @@index([status])
 }
 
 /// Append-only record of privileged actions, so "who blocked this seller" and
@@ -431,8 +554,21 @@ model Truck {
   recommended  Boolean @default(false)
   body         String
   plate        String
+  /// Plate with spaces and hyphens stripped, uppercased. People type
+  /// "TN30AB4821", "tn 30 ab 4821" and "TN-30-AB-4821" for the same vehicle,
+  /// so searches run against this rather than the display form.
+  plateKey     String?
+
+  /// Registration certificate number. Not secret — it is on the vehicle.
+  rcNumber          String?
+  /// Cover and permit both lapse, and an expired one means the truck must not
+  /// carry goods. Staff see these on the verification queue.
+  insuranceExpiry   DateTime?
+  permitExpiry      DateTime?
 
   bookings TruckBooking[]
+
+  @@index([plateKey])
 }
 
 model Follow {

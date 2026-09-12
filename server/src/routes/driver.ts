@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireDriver } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { normalisePlate } from "../lib/plate.js";
 
 export const driverRouter = Router();
 
@@ -223,7 +224,7 @@ driverRouter.patch(
       where: { id: driver.truck.id },
       data: {
         ...body,
-        ...(body.plate ? { plate: body.plate.toUpperCase() } : {}),
+        ...(body.plate ? { plate: body.plate.toUpperCase(), plateKey: normalisePlate(body.plate) } : {}),
         ...(body.capacityTons
           ? {
               capacityKg: Math.round(body.capacityTons * 1000),

@@ -52,7 +52,17 @@ export function isPlausibleFarmerCard(raw: string): boolean {
   return /^[A-Z0-9/-]{6,30}$/.test(value);
 }
 
-/** The GSTIN embeds the holder's PAN at positions 3–12. */
+/**
+ * Driving licences are issued by each state's RTO and the formats vary a lot
+ * (TN37 20190001234, MH12 20110012345, DL-1420110012345). Check the shape only
+ * and let a staff member confirm it against the uploaded licence.
+ */
+export function isPlausibleLicence(raw: string): boolean {
+  const v = raw.trim().toUpperCase().replace(/[\s-]/g, "");
+  return /^[A-Z]{2}[0-9]{9,14}$/.test(v);
+}
+
+/** The GSTIN embeds the holder’s PAN at positions 3–12. */
 export function panFromGSTIN(gstin: string): string {
   return gstin.trim().toUpperCase().slice(2, 12);
 }
