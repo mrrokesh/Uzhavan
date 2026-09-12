@@ -421,6 +421,11 @@ export type DocumentType =
   | "GST_CERTIFICATE"
   | "MSME_CERTIFICATE"
   | "PAN_CARD"
+  // Driver / vehicle
+  | "DRIVING_LICENCE"
+  | "VEHICLE_RC"
+  | "VEHICLE_INSURANCE"
+  | "VEHICLE_PERMIT"
   | "OTHER";
 
 export type VerificationState = {
@@ -440,7 +445,7 @@ export type VerificationState = {
     sizeBytes: number;
     uploadedAt: string;
   }[];
-  required: { identifier: "farmerCard" | "gstinOrUdyam"; documents: DocumentType[] };
+  required: { identifier: "farmerCard" | "gstinOrUdyam" | "licence"; documents: DocumentType[] };
 };
 
 export type UploadDoc = {
@@ -448,6 +453,35 @@ export type UploadDoc = {
   filename: string;
   mimeType: string;
   data: string;
+};
+
+/** Everything /verification accepts. Which fields are required depends on role. */
+export type VerificationSubmission = {
+  gstin?: string;
+  udyam?: string;
+  pan?: string;
+  farmerCard?: string;
+  licence?: string;
+  rcNumber?: string;
+  /** ISO date, yyyy-mm-dd. Cover and permit lapse; staff need the dates. */
+  insuranceExpiry?: string;
+  permitExpiry?: string;
+  documents: UploadDoc[];
+};
+
+// ---- Announcements ---------------------------------------------------------
+
+export type Audience = "ALL" | "FARMERS" | "BUYERS" | "DRIVERS";
+
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  audience: Audience;
+  pinned: boolean;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  read: boolean;
 };
 
 // ---- Support tickets -------------------------------------------------------

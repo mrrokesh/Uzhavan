@@ -24,6 +24,8 @@ import {
   type TicketThread,
   type UploadDoc,
   type VerificationState,
+  type VerificationSubmission,
+  type Announcement,
 } from "./types";
 
 export const keys = {
@@ -474,17 +476,47 @@ export function useVerification() {
 export function useSubmitVerification() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      gstin?: string;
-      udyam?: string;
-      pan?: string;
-      farmerCard?: string;
-      documents: UploadDoc[];
-    }) => api<{ status: string }>("/verification", { method: "POST", body }),
+    mutationFn: (body: VerificationSubmission) =>
+      api<{ status: string }>("/verification", { method: "POST", body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["verification"] });
       qc.invalidateQueries({ queryKey: keys.me });
     },
+  });
+}
+
+// ---- Announcements ---------------------------------------------------------
+
+export function useAnnouncements() {
+  return useQuery({
+    queryKey: ["announcements"],
+    queryFn: () => api<Announcement[]>("/announcements"),
+  });
+}
+
+/** Drives the bell badge. Cheap enough to poll; it's a single count query. */
+export function useUnreadAnnouncements() {
+  return useQuery({
+    queryKey: ["announcements", "unread"],
+    queryFn: () => api<{ count: number }>("/announcements/unread-count"),
+    refetchInterval: 120_000,
+  });
+}
+
+export function useMarkAnnouncementRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ read: boolean }>(`/announcements/${id}/read`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
+  });
+}
+
+export function useMarkAllAnnouncementsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ marked: number }>("/announcements/read-all", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
   });
 }
 

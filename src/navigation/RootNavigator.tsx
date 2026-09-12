@@ -29,6 +29,7 @@ import { CropForm } from "../screens/farmer/CropForm";
 import { FarmerRequests } from "../screens/farmer/Requests";
 import { FarmerRequestDetail } from "../screens/farmer/RequestDetail";
 import { FarmerAccount } from "../screens/farmer/FarmerAccount";
+import { Demand } from "../screens/farmer/Demand";
 
 // Driver
 import { DriverJobs } from "../screens/driver/Jobs";
@@ -39,6 +40,7 @@ import { DriverAccount } from "../screens/driver/DriverAccount";
 // Shared
 import { Verification } from "../screens/shared/Verification";
 import { Help, MyTickets, NewTicket, TicketDetail } from "../screens/shared/Support";
+import { Announcements } from "../screens/shared/Announcements";
 
 import { colors } from "../theme";
 import type {
@@ -126,6 +128,7 @@ function BuyerApp() {
         <BuyerStack.Screen name="MyTickets" component={MyTickets} />
         <BuyerStack.Screen name="NewTicket" component={NewTicket} />
         <BuyerStack.Screen name="TicketDetail" component={TicketDetail} />
+        <BuyerStack.Screen name="Announcements" component={Announcements} />
       </BuyerStack.Navigator>
     </AppProvider>
   );
@@ -162,6 +165,8 @@ function FarmerApp() {
       <FarmerStack.Screen name="MyTickets" component={MyTickets} />
       <FarmerStack.Screen name="NewTicket" component={NewTicket} />
       <FarmerStack.Screen name="TicketDetail" component={TicketDetail} />
+      <FarmerStack.Screen name="Announcements" component={Announcements} />
+      <FarmerStack.Screen name="Demand" component={Demand} />
     </FarmerStack.Navigator>
   );
 }
@@ -194,6 +199,7 @@ function DriverApp() {
       <DriverStack.Screen name="MyTickets" component={MyTickets} />
       <DriverStack.Screen name="NewTicket" component={NewTicket} />
       <DriverStack.Screen name="TicketDetail" component={TicketDetail} />
+      <DriverStack.Screen name="Announcements" component={Announcements} />
     </DriverStack.Navigator>
   );
 }

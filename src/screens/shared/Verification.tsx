@@ -33,7 +33,14 @@ const LABELS: Partial<Record<DocumentType, string>> = {
   GST_CERTIFICATE: "GST certificate",
   MSME_CERTIFICATE: "Udyam / MSME certificate",
   PAN_CARD: "PAN card",
+  DRIVING_LICENCE: "Driving licence",
+  VEHICLE_RC: "Vehicle RC book",
+  VEHICLE_INSURANCE: "Insurance certificate",
+  VEHICLE_PERMIT: "Goods carriage permit",
 };
+
+/** yyyy-mm-dd, which is what the server's z.string().date() wants. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function Verification() {
   const navigation = useNavigation();
@@ -42,8 +49,12 @@ export function Verification() {
   const submit = useSubmitVerification();
 
   const isFarmer = user?.role === "FARMER";
+  const isDriver = user?.role === "DRIVER";
   const [idNumber, setIdNumber] = useState("");
   const [pan, setPan] = useState("");
+  const [rcNumber, setRcNumber] = useState("");
+  const [insuranceExpiry, setInsuranceExpiry] = useState("");
+  const [permitExpiry, setPermitExpiry] = useState("");
   const [docs, setDocs] = useState<Picked[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -111,12 +122,27 @@ export function Verification() {
 
   const send = async () => {
     if (!idNumber.trim()) {
-      setError(isFarmer ? "Enter your farmer card number" : "Enter your GSTIN or Udyam number");
+      setError(
+        isFarmer
+          ? "Enter your farmer card number"
+          : isDriver
+            ? "Enter your driving licence number"
+            : "Enter your GSTIN or Udyam number",
+      );
       return;
     }
     if (docs.length === 0) {
       setError("Attach at least one document");
       return;
+    }
+    for (const [label, value] of [
+      ["Insurance expiry", insuranceExpiry],
+      ["Permit expiry", permitExpiry],
+    ] as const) {
+      if (isDriver && value.trim() && !ISO_DATE.test(value.trim())) {
+        setError(`${label} should be written as YYYY-MM-DD`);
+        return;
+      }
     }
 
     const value = idNumber.trim().toUpperCase();
@@ -129,9 +155,18 @@ export function Verification() {
       })),
       ...(pan.trim() ? { pan: pan.trim() } : {}),
     };
-    if (isFarmer) body.farmerCard = value;
-    else if (value.startsWith("UDYAM")) body.udyam = value;
-    else body.gstin = value;
+    if (isFarmer) {
+      body.farmerCard = value;
+    } else if (isDriver) {
+      body.licence = value;
+      if (rcNumber.trim()) body.rcNumber = rcNumber.trim().toUpperCase();
+      if (insuranceExpiry.trim()) body.insuranceExpiry = insuranceExpiry.trim();
+      if (permitExpiry.trim()) body.permitExpiry = permitExpiry.trim();
+    } else if (value.startsWith("UDYAM")) {
+      body.udyam = value;
+    } else {
+      body.gstin = value;
+    }
 
     setWorking(true);
     setError(null);
@@ -140,6 +175,9 @@ export function Verification() {
       setDocs([]);
       setIdNumber("");
       setPan("");
+      setRcNumber("");
+      setInsuranceExpiry("");
+      setPermitExpiry("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn’t submit. Check your connection.");
     } finally {
@@ -160,11 +198,14 @@ export function Verification() {
           <Text style={styles.sub}>
             {isFarmer
               ? "Buyers can see that your farm is verified. It helps them trust your listings."
-              : "Farmers can see that your business is verified, which makes them more likely to accept."}
+              : isDriver
+                ? "Your licence and papers are on file. Verified drivers get offered jobs first."
+                : "Farmers can see that your business is verified, which makes them more likely to accept."}
           </Text>
           {s.idLast4 ? (
             <Text style={styles.faint}>
-              {isFarmer ? "Farmer card" : "Registered number"} ending {s.idLast4}
+              {isFarmer ? "Farmer card" : isDriver ? "Licence" : "Registered number"} ending{" "}
+              {s.idLast4}
             </Text>
           ) : null}
         </ScrollView>
@@ -227,20 +268,70 @@ export function Verification() {
           <Text style={styles.lead}>
             {isFarmer
               ? "Verified farms sell more. Buyers see a badge on your listings once we’ve checked your details."
-              : "Verified buyers get accepted faster. Farmers can see that your business is registered."}
+              : isDriver
+                ? "Verified drivers get offered jobs first. We check your licence and the truck’s papers before you carry goods."
+                : "Verified buyers get accepted faster. Farmers can see that your business is registered."}
           </Text>
 
           <Text style={styles.section}>
-            {isFarmer ? "Your farmer card" : "Your business registration"}
+            {isFarmer
+              ? "Your farmer card"
+              : isDriver
+                ? "Your licence"
+                : "Your business registration"}
           </Text>
           <Field
-            label={isFarmer ? "Farmer card number" : "GSTIN or Udyam number"}
+            label={
+              isFarmer
+                ? "Farmer card number"
+                : isDriver
+                  ? "Driving licence number"
+                  : "GSTIN or Udyam number"
+            }
             value={idNumber}
             onChangeText={setIdNumber}
-            placeholder={isFarmer ? "TN/DGL/2019/004521" : "27AAPFU0939F1ZV"}
+            placeholder={
+              isFarmer ? "TN/DGL/2019/004521" : isDriver ? "TN3720190001234" : "27AAPFU0939F1ZV"
+            }
             autoCapitalize="characters"
           />
-          {!isFarmer ? (
+
+          {isDriver ? (
+            <>
+              <Text style={styles.section}>Your vehicle</Text>
+              <Field
+                label="RC number (optional)"
+                value={rcNumber}
+                onChangeText={setRcNumber}
+                placeholder="TN30AB4821"
+                autoCapitalize="characters"
+              />
+              <View style={{ marginTop: 14 }}>
+                <Field
+                  label="Insurance valid until (optional)"
+                  value={insuranceExpiry}
+                  onChangeText={setInsuranceExpiry}
+                  placeholder="2027-03-31"
+
+                />
+              </View>
+              <View style={{ marginTop: 14 }}>
+                <Field
+                  label="Permit valid until (optional)"
+                  value={permitExpiry}
+                  onChangeText={setPermitExpiry}
+                  placeholder="2027-03-31"
+
+                />
+              </View>
+              <Text style={styles.hint}>
+                Dates as YYYY-MM-DD. We use them to warn you before cover lapses — an expired
+                insurance or permit means the truck can’t legally carry goods.
+              </Text>
+            </>
+          ) : null}
+
+          {!isFarmer && !isDriver ? (
             <View style={{ marginTop: 14 }}>
               <Field
                 label="PAN (optional)"
