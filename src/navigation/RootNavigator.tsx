@@ -33,6 +33,10 @@ import { DriverTrips } from "../screens/driver/Trips";
 import { TripDetail } from "../screens/driver/TripDetail";
 import { DriverAccount } from "../screens/driver/DriverAccount";
 
+// Shared
+import { Verification } from "../screens/shared/Verification";
+import { Help, MyTickets, NewTicket, TicketDetail } from "../screens/shared/Support";
+
 import { colors } from "../theme";
 import type {
   AuthStackParamList,
@@ -114,6 +118,11 @@ function BuyerApp() {
         <BuyerStack.Screen name="ReviewBooking" component={ReviewBooking} />
         <BuyerStack.Screen name="TrackTruck" component={TrackTruck} />
         <BuyerStack.Screen name="DeliveryCompleted" component={DeliveryCompleted} />
+        <BuyerStack.Screen name="Verification" component={Verification} />
+        <BuyerStack.Screen name="Help" component={Help} />
+        <BuyerStack.Screen name="MyTickets" component={MyTickets} />
+        <BuyerStack.Screen name="NewTicket" component={NewTicket} />
+        <BuyerStack.Screen name="TicketDetail" component={TicketDetail} />
       </BuyerStack.Navigator>
     </AppProvider>
   );
@@ -145,6 +154,11 @@ function FarmerApp() {
       <FarmerStack.Screen name="FarmerTabs" component={FarmerTabs} />
       <FarmerStack.Screen name="CropForm" component={CropForm} />
       <FarmerStack.Screen name="FarmerRequestDetail" component={FarmerRequestDetail} />
+      <FarmerStack.Screen name="Verification" component={Verification} />
+      <FarmerStack.Screen name="Help" component={Help} />
+      <FarmerStack.Screen name="MyTickets" component={MyTickets} />
+      <FarmerStack.Screen name="NewTicket" component={NewTicket} />
+      <FarmerStack.Screen name="TicketDetail" component={TicketDetail} />
     </FarmerStack.Navigator>
   );
 }
@@ -172,6 +186,11 @@ function DriverApp() {
     <DriverStack.Navigator screenOptions={stackOptions}>
       <DriverStack.Screen name="DriverTabs" component={DriverTabs} />
       <DriverStack.Screen name="TripDetail" component={TripDetail} />
+      <DriverStack.Screen name="Verification" component={Verification} />
+      <DriverStack.Screen name="Help" component={Help} />
+      <DriverStack.Screen name="MyTickets" component={MyTickets} />
+      <DriverStack.Screen name="NewTicket" component={NewTicket} />
+      <DriverStack.Screen name="TicketDetail" component={TicketDetail} />
     </DriverStack.Navigator>
   );
 }

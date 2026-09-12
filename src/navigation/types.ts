@@ -1,5 +1,15 @@
 import type { Role } from "../api/types";
 
+
+/** Screens every role can reach from their profile tab. */
+export type SharedScreens = {
+  Verification: undefined;
+  Help: undefined;
+  MyTickets: undefined;
+  NewTicket: undefined;
+  TicketDetail: { code: string };
+};
+
 export type AuthStackParamList = {
   Login: undefined;
   ChooseRole: undefined;
@@ -8,7 +18,7 @@ export type AuthStackParamList = {
 
 // ---- Buyer -----------------------------------------------------------------
 
-export type RootStackParamList = {
+export type RootStackParamList = SharedScreens & {
   Tabs: undefined;
   CropDetail: { id: string };
   FarmerProfile: { farmId: string; cropId: string };
@@ -37,7 +47,7 @@ export type TabParamList = {
 
 // ---- Farmer ----------------------------------------------------------------
 
-export type FarmerStackParamList = {
+export type FarmerStackParamList = SharedScreens & {
   FarmerTabs: undefined;
   CropForm: { cropId?: string };
   FarmerRequestDetail: { requestId: string };
@@ -52,7 +62,7 @@ export type FarmerTabParamList = {
 
 // ---- Driver ----------------------------------------------------------------
 
-export type DriverStackParamList = {
+export type DriverStackParamList = SharedScreens & {
   DriverTabs: undefined;
   TripDetail: { bookingId: string };
 };

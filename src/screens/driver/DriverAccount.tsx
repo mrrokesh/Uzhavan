@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "../../components/Chrome";
 import { Logo } from "../../components/Logo";
 import { Chip, Field, OutlineButton, PrimaryButton } from "../../components/ui";
+import { ProfileLinks } from "../../components/ProfileLinks";
 import { useDriverSummary, useSetAvailability, useUpdateTruck } from "../../api/hooks";
 import { useAuth } from "../../context/AuthContext";
 import { imageFor } from "../../lib/images";
@@ -118,6 +119,8 @@ export function DriverAccount() {
           <InfoRow icon="call-outline" title={user?.phone ?? "—"} sub="Your number" />
           <InfoRow icon="mail-outline" title={user?.email ?? "—"} sub="Sign-in email" last />
         </View>
+
+        <ProfileLinks />
 
         <View style={styles.stats}>
           <Stat n={String(summary.data?.completedTrips ?? 0)} l="Trips done" />

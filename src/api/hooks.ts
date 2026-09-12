@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
@@ -14,6 +15,12 @@ import {
   type Fare,
   type Me,
   type Truck,
+  type AppConfig,
+  type Ticket,
+  type TicketCategory,
+  type TicketThread,
+  type UploadDoc,
+  type VerificationState,
 } from "./types";
 
 export const keys = {
@@ -422,5 +429,93 @@ export function useUpdateTruck() {
     mutationFn: (body: Record<string, string | number>) =>
       api<ApiTruck>("/driver/truck", { method: "PATCH", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.driverSummary }),
+  });
+}
+
+// ---- Verification (KYC) ----------------------------------------------------
+
+export function useVerification() {
+  return useQuery({
+    queryKey: ["verification"],
+    queryFn: () => api<VerificationState>("/verification"),
+    // Poll while under review so approval shows up without a manual refresh.
+    refetchInterval: (q) => (q.state.data?.status === "PENDING" ? 20_000 : false),
+  });
+}
+
+export function useSubmitVerification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      gstin?: string;
+      udyam?: string;
+      pan?: string;
+      farmerCard?: string;
+      documents: UploadDoc[];
+    }) => api<{ status: string }>("/verification", { method: "POST", body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["verification"] });
+      qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+// ---- Support tickets -------------------------------------------------------
+
+export function useTickets() {
+  return useQuery({
+    queryKey: ["tickets"],
+    queryFn: () => api<Ticket[]>("/tickets"),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useTicket(code: string | undefined) {
+  return useQuery({
+    queryKey: ["ticket", code ?? "none"],
+    enabled: !!code,
+    queryFn: () => api<TicketThread>(`/tickets/${code}`),
+    refetchInterval: 20_000,
+  });
+}
+
+export function useRaiseTicket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      category: TicketCategory;
+      subject: string;
+      message: string;
+      orderCode?: string;
+    }) => api<Ticket>("/tickets", { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tickets"] }),
+  });
+}
+
+export function useReplyToTicket(code: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) =>
+      api(`/tickets/${code}/reply`, { method: "POST", body: { body } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ticket", code] });
+      qc.invalidateQueries({ queryKey: ["tickets"] });
+    },
+  });
+}
+
+// ---- App config (support details + version gate) --------------------------
+
+export function useAppConfig(app: "BUYER" | "PARTNER", version: string) {
+  return useQuery({
+    queryKey: ["app-config", app, version],
+    queryFn: () => {
+      const platform = Platform.OS === "ios" ? "IOS" : "ANDROID";
+      return api<AppConfig>(`/app/config?app=${app}&platform=${platform}&version=${version}`);
+    },
+    // Unauthenticated on purpose — a force-update screen and the support
+    // number both have to work before anyone signs in.
+    staleTime: 5 * 60_000,
+    retry: 1,
   });
 }

@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "../../components/Chrome";
 import { Logo } from "../../components/Logo";
 import { Chip, OutlineButton } from "../../components/ui";
+import { ProfileLinks } from "../../components/ProfileLinks";
 import { useFarmerOrders, useFarmerSummary } from "../../api/hooks";
 import { useAuth } from "../../context/AuthContext";
 import { imageFor } from "../../lib/images";
@@ -37,6 +38,8 @@ export function FarmerAccount() {
           <InfoRow icon="mail-outline" title={user?.email ?? "—"} sub="Sign-in email" />
           <InfoRow icon="location-outline" title={farm?.district ?? "—"} sub="District" last />
         </View>
+
+        <ProfileLinks />
 
         <Text style={styles.section}>Sales</Text>
         {orders.isLoading ? <ActivityIndicator color={colors.forest} style={{ marginTop: 12 }} /> : null}
