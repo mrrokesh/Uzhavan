@@ -13,6 +13,9 @@ import { Staff } from "./pages/Staff";
 import { Settings } from "./pages/Settings";
 import { Releases } from "./pages/Releases";
 import { Audit } from "./pages/Audit";
+import { Announcements } from "./pages/Announcements";
+import { Payments } from "./pages/Payments";
+import { Tracking } from "./pages/Tracking";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +41,9 @@ function Gate() {
         <Route path="verification" element={<Verification />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="tickets" element={<Tickets />} />
+        <Route path="tracking" element={<Tracking />} />
+        <Route path="announcements" element={<Announcements />} />
+        <Route path="payments" element={<Payments />} />
         <Route path="staff" element={<Staff />} />
         <Route path="settings" element={<Settings />} />
         <Route path="releases" element={<Releases />} />

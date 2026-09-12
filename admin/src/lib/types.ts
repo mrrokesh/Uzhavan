@@ -158,3 +158,67 @@ export type AuditEntry = {
   createdAt: string;
   actor: { id: string; name: string; role: Role } | null;
 };
+
+export type Audience = "ALL" | "FARMERS" | "BUYERS" | "DRIVERS";
+
+export type AdminAnnouncement = {
+  id: string;
+  title: string;
+  body: string;
+  audience: Audience;
+  pinned: boolean;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  reads: number;
+  audienceSize: number;
+  author: { id: string; name: string } | null;
+};
+
+export type Gateway = {
+  id: string;
+  label: string;
+  mode: "TEST" | "LIVE";
+  keyId: string;
+  /** Without one, Razorpay's callbacks can't be verified. */
+  hasWebhookSecret: boolean;
+  active: boolean;
+  createdAt: string;
+};
+
+export type TrackedVehicle = {
+  truck: {
+    id: string;
+    name: string;
+    plate: string;
+    body: string;
+    capacityKg: number;
+    rcNumber: string | null;
+    insuranceExpiry: string | null;
+    permitExpiry: string | null;
+    insuranceExpired: boolean;
+    permitExpired: boolean;
+  };
+  driver: {
+    id: string;
+    name: string;
+    phone: string | null;
+    rating: number;
+    trips: number;
+    online: boolean;
+    accountStatus: string;
+    verification: string;
+  };
+  currentTrip: {
+    code: string;
+    status: string;
+    pickup: string;
+    destination: string;
+    product: string;
+    quantityKg: number;
+    orderCode: string;
+    farm: string | null;
+    buyer: string;
+    buyerPhone: string | null;
+  } | null;
+};
