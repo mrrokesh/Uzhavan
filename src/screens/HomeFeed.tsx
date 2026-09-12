@@ -7,10 +7,12 @@ import { Logo } from "../components/Logo";
 import { Screen } from "../components/Chrome";
 import { Chip } from "../components/ui";
 import { FeedCard } from "../components/Widgets";
+import { NotificationBell } from "../components/NotificationBell";
+import { SuggestedRow } from "../components/SuggestedRow";
 import { useApp } from "../context/AppContext";
 import { FilterBar, FilterSheet } from "../components/CropFilters";
 import type { CropFilters as Filters } from "../api/types";
-import { useCrops, useMe, useRequests, useToggleSaved } from "../api/hooks";
+import { useCrops, useMe, useToggleSaved } from "../api/hooks";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
 
@@ -29,14 +31,11 @@ export function HomeFeed() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const cropsQuery = useCrops(filter, search, filters);
   const me = useMe();
-  const requests = useRequests();
   const toggleSaved = useToggleSaved();
 
   const saved = me.data?.saved ?? [];
   const rows = cropsQuery.data?.crops ?? [];
   const origin = cropsQuery.data?.origin ?? null;
-  // A real notification dot: the farmer has responded to something of yours.
-  const hasUpdate = (requests.data ?? []).some((r) => r.status === "FARMER_ACCEPTED");
 
   return (
     <Screen>
@@ -57,10 +56,7 @@ export function HomeFeed() {
             <View style={styles.loc}>
               <Text style={styles.locText}>📍 {me.data?.district ?? "Tamil Nadu"} ▾</Text>
             </View>
-            <View style={styles.bell}>
-              <Ionicons name="notifications-outline" size={18} color={colors.ink} />
-              {hasUpdate ? <View style={styles.dot} /> : null}
-            </View>
+            <NotificationBell />
           </View>
         </View>
 
@@ -96,6 +92,13 @@ export function HomeFeed() {
           onOpen={() => setSheetOpen(true)}
           onClear={() => setFilters({})}
         />
+
+        {/* Only on the unfiltered default view. Someone who has narrowed the
+            list to one district under ₹30 is answering their own question, and
+            a row of our picks underneath it is noise. */}
+        {filter === "for-you" && !search.trim() && Object.keys(filters).length === 0 ? (
+          <SuggestedRow onOpen={(id) => navigation.navigate("CropDetail", { id })} />
+        ) : null}
 
         <View style={{ marginTop: 16, gap: 12 }}>
           {cropsQuery.isLoading ? (
@@ -144,15 +147,6 @@ const styles = StyleSheet.create({
   topRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   loc: { backgroundColor: colors.white, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, ...shadow },
   locText: { fontSize: 12, fontWeight: "500", color: colors.ink },
-  bell: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.white,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dot: { position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger },
   search: {
     marginTop: 16,
     height: 48,

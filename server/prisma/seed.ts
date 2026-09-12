@@ -344,6 +344,38 @@ async function main() {
       description: "Displayed next to the contact details.",
       isPublic: true,
     },
+    {
+      key: "platform_fee_percent",
+      value: "5",
+      label: "Platform fee (%)",
+      description:
+        "Charged to buyers on top of the price the farmer agreed. Farmers and drivers pay nothing. Minimum 5%, maximum 30%.",
+      isPublic: false,
+    },
+    {
+      key: "payout_policy",
+      value: "SPLIT_ON_LOAD",
+      label: "When farmers get paid",
+      description:
+        "SPLIT_ON_LOAD releases an advance when the driver confirms the load and the rest after delivery. AFTER_DELIVERY pays nothing until delivered — the Amazon / Flipkart shape.",
+      isPublic: false,
+    },
+    {
+      key: "payout_advance_percent",
+      value: "30",
+      label: "Advance on loading (%)",
+      description:
+        "Only under SPLIT_ON_LOAD, and only for verified farmers whose crop moves on a booked truck. 0 to 50.",
+      isPublic: false,
+    },
+    {
+      key: "payout_hold_hours",
+      value: "48",
+      label: "Hold after delivery (hours)",
+      description:
+        "The dispute window. Once it passes the rest is released automatically, so a silent buyer can't strand a farmer's money. 0 to 336.",
+      isPublic: false,
+    },
   ];
   for (const s of settings) {
     await prisma.appSetting.upsert({ where: { key: s.key }, create: s, update: { label: s.label, description: s.description, isPublic: s.isPublic } });

@@ -6,9 +6,11 @@ import { when } from "../lib/format";
 import { Badge, Card, Field, Modal, Spinner } from "../components/ui";
 import type { Release } from "../lib/types";
 
+// PARTNER is the stored enum value; "Uzhavan" is what it's called everywhere
+// a person can see. Keep the label, not the key, in front of staff.
 const APPS = [
-  { key: "BUYER" as const, label: "Uzhavan (buyers)" },
-  { key: "PARTNER" as const, label: "Uzhavan Partner (farmers & drivers)" },
+  { key: "PARTNER" as const, label: "Uzhavan (farmers & drivers)" },
+  { key: "BUYER" as const, label: "Uzhavan Buy (wholesale buyers)" },
 ];
 
 type Draft = {
@@ -137,7 +139,7 @@ export function Releases() {
 
       {draft ? (
         <Modal
-          title={`${draft.app === "BUYER" ? "Uzhavan" : "Uzhavan Partner"} · ${
+          title={`${draft.app === "BUYER" ? "Uzhavan Buy" : "Uzhavan"} · ${
             draft.platform === "ANDROID" ? "Android" : "iOS"
           }`}
           onClose={() => setDraft(null)}

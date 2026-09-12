@@ -67,6 +67,38 @@ enum Audience {
 enum PaymentPurpose {
   TRUCK_BOOKING
   PLUS_SUBSCRIPTION
+  CROP_ORDER
+}
+
+/// How a farmer gets paid once the buyer has paid in full. Set in the admin
+/// console; see src/payouts.ts.
+enum PayoutPolicy {
+  /// An advance the moment the driver confirms the load, balance on delivery.
+  /// Faster for the farmer, and the trigger is a third party rather than the
+  /// farmer's own word.
+  SPLIT_ON_LOAD
+  /// Nothing until delivered, then a settlement hold before release — the
+  /// Amazon / Flipkart shape. Slowest for the farmer, safest for disputes.
+  AFTER_DELIVERY
+}
+
+enum PayoutStage {
+  /// Released against the load being picked up.
+  ADVANCE
+  /// Everything still owed after any advance.
+  BALANCE
+}
+
+enum PayoutState {
+  /// Scheduled, not yet due.
+  HELD
+  /// Due and sent to the gateway.
+  RELEASED
+  /// Gateway confirmed the farmer has the money.
+  PAID
+  FAILED
+  /// Order cancelled or refunded before release.
+  CANCELLED
 }
 
 enum PaymentStatus {
@@ -204,13 +236,13 @@ model User {
   moderated         User[]        @relation("StatusModerator")
 
   // --- KYC ---
-  verification            VerificationStatus @default(UNVERIFIED)
-  verificationSubmittedAt DateTime?
-  verificationReviewedAt  DateTime?
-  verificationReviewedBy  User?              @relation("KycReviewer", fields: [verificationReviewedById], references: [id])
+  verification             VerificationStatus @default(UNVERIFIED)
+  verificationSubmittedAt  DateTime?
+  verificationReviewedAt   DateTime?
+  verificationReviewedBy   User?              @relation("KycReviewer", fields: [verificationReviewedById], references: [id])
   verificationReviewedById String?
-  reviewed                User[]             @relation("KycReviewer")
-  rejectionReason         String?
+  reviewed                 User[]             @relation("KycReviewer")
+  rejectionReason          String?
 
   /// Business/farm identifiers, AES-256-GCM encrypted at rest. The matching
   /// *Index columns are deterministic HMACs so we can enforce uniqueness and
@@ -245,13 +277,16 @@ model User {
   saves    SavedCrop[]
 
   payments          Payment[]
+  linkedAccount     LinkedAccount?
+  payouts           Payout[]           @relation("PayoutFarmer")
+  payoutOverrides   Payout[]           @relation("PayoutOverride")
   announcementsRead AnnouncementRead[]
-  announcementsMade Announcement[]  @relation("AnnouncementAuthor")
-  ticketsRaised    Ticket[]        @relation("TicketRaiser")
-  ticketsAssigned  Ticket[]        @relation("TicketAssignee")
-  ticketMessages   TicketMessage[]
-  auditEntries     AuditLog[]      @relation("AuditActor")
-  settingsChanged  AppSetting[]
+  announcementsMade Announcement[]     @relation("AnnouncementAuthor")
+  ticketsRaised     Ticket[]           @relation("TicketRaiser")
+  ticketsAssigned   Ticket[]           @relation("TicketAssignee")
+  ticketMessages    TicketMessage[]
+  auditEntries      AuditLog[]         @relation("AuditActor")
+  settingsChanged   AppSetting[]
   releasesPublished AppRelease[]
 
   createdAt DateTime @default(now())
@@ -299,10 +334,10 @@ model Ticket {
 }
 
 model TicketMessage {
-  id       String @id @default(cuid())
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  id       String  @id @default(cuid())
+  ticket   Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId String
-  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author   User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId String
   body     String
   /// Staff-only note; never shown to the person who raised the ticket.
@@ -316,12 +351,12 @@ model TicketMessage {
 /// Runtime configuration the admin edits instead of asking for a code change —
 /// support phone, support email, and anything similar added later.
 model AppSetting {
-  key         String   @id
+  key         String  @id
   value       String
   label       String
   description String?
   /// Readable by unauthenticated apps (e.g. the support number on a login screen).
-  isPublic    Boolean  @default(false)
+  isPublic    Boolean @default(false)
 
   updatedAt   DateTime @updatedAt
   updatedBy   User?    @relation(fields: [updatedById], references: [id])
@@ -341,7 +376,7 @@ model AppRelease {
   releaseNotes        String?
   storeUrl            String?
   /// Force every build below `latestVersion`, not just those below the minimum.
-  mandatory           Boolean  @default(false)
+  mandatory           Boolean @default(false)
 
   updatedAt   DateTime @updatedAt
   updatedBy   User?    @relation(fields: [updatedById], references: [id])
@@ -389,18 +424,18 @@ model AnnouncementRead {
 /// Razorpay credentials, swappable from the console so a blocked or rotated
 /// account can be replaced without a deploy. Secrets are AES-256-GCM encrypted.
 model PaymentGateway {
-  id           String      @id @default(cuid())
-  label        String
-  mode         PaymentMode @default(TEST)
-  keyId        String
-  keySecretEnc String
+  id               String      @id @default(cuid())
+  label            String
+  mode             PaymentMode @default(TEST)
+  keyId            String
+  keySecretEnc     String
   webhookSecretEnc String?
   /// Exactly one gateway is active at a time; activating another stands this down.
-  active       Boolean     @default(false)
+  active           Boolean     @default(false)
 
   payments  Payment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([active])
 }
@@ -429,8 +464,71 @@ model Payment {
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
+  payouts Payout[]
+
   @@index([userId])
   @@index([status])
+}
+
+/// A farmer's Razorpay Route account. Buyer money never sits in our own
+/// current account — RBI's payment-aggregator rules don't allow that — so the
+/// gateway holds it and we tell it when to let go.
+model LinkedAccount {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  /// Razorpay's account id, acc_XXXXXXXX.
+  routeAccountId String      @unique
+  mode           PaymentMode @default(TEST)
+  /// Set once Razorpay says the account can receive settlements.
+  activatedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// One slice of a farmer's money for one order. The buyer always pays the full
+/// amount up front; these rows decide when the farmer sees it.
+model Payout {
+  id      String @id @default(cuid())
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  /// The farmer being paid, not the farm — payouts follow the account.
+  farmer   User   @relation("PayoutFarmer", fields: [farmerId], references: [id], onDelete: Cascade)
+  farmerId String
+
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+  paymentId String?
+
+  stage  PayoutStage
+  state  PayoutState  @default(HELD)
+  /// Whole rupees, as the rest of the app counts money.
+  amount Int
+  /// The policy this was scheduled under, kept so changing the policy later
+  /// can't rewrite what an existing order was promised.
+  policy PayoutPolicy
+
+  /// When the sweeper may release it. Null means "not until an event says so".
+  releaseAfter DateTime?
+  releasedAt   DateTime?
+  paidAt       DateTime?
+
+  /// Razorpay Route transfer id, trf_XXXXXXXX.
+  routeTransferId String?
+  failureReason   String?
+  /// Set when a human released this early or held it back.
+  overriddenBy    User?   @relation("PayoutOverride", fields: [overriddenById], references: [id])
+  overriddenById  String?
+  note            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([state, releaseAfter])
+  @@index([farmerId])
+  @@index([orderId])
 }
 
 /// Append-only record of privileged actions, so "who blocked this seller" and
@@ -455,18 +553,18 @@ model AuditLog {
 /// dragged into an ordinary user query, and encrypted so a database dump
 /// doesn't leak government IDs.
 model KycDocument {
-  id       String       @id @default(cuid())
-  owner    User         @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId  String
-  type     DocumentType
-  filename String
-  mimeType String
+  id        String       @id @default(cuid())
+  owner     User         @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String
+  type      DocumentType
+  filename  String
+  mimeType  String
   /// Size of the original file, before encryption.
   sizeBytes Int
   /// AES-256-GCM: [12-byte IV][16-byte tag][ciphertext]
-  data     Bytes
+  data      Bytes
   /// SHA-256 of the plaintext, to spot duplicate uploads.
-  checksum String
+  checksum  String
 
   uploadedAt DateTime @default(now())
 
@@ -474,21 +572,21 @@ model KycDocument {
 }
 
 model Farm {
-  id        String @id @default(cuid())
-  owner     User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId   String @unique
-  name      String
-  ownerName String
-  district  String
+  id          String   @id @default(cuid())
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String   @unique
+  name        String
+  ownerName   String
+  district    String
   /// Free-text `district` resolved to one of Tamil Nadu's 38 districts, so
   /// radius filtering runs as an indexed IN rather than in memory.
   /// See src/data/districts.ts.
   districtKey String?
-  location  String
-  rating    Float  @default(5)
-  avatarKey String @default("arul")
-  crops     Crop[]
-  createdAt DateTime @default(now())
+  location    String
+  rating      Float    @default(5)
+  avatarKey   String   @default("arul")
+  crops       Crop[]
+  createdAt   DateTime @default(now())
 
   @@index([districtKey])
 }
@@ -521,7 +619,7 @@ model Crop {
   orders    Order[]
   follows   Follow[]
   saves     SavedCrop[]
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
 }
 
 model Driver {
@@ -560,11 +658,11 @@ model Truck {
   plateKey     String?
 
   /// Registration certificate number. Not secret — it is on the vehicle.
-  rcNumber          String?
+  rcNumber        String?
   /// Cover and permit both lapse, and an expired one means the truck must not
   /// carry goods. Staff see these on the verification queue.
-  insuranceExpiry   DateTime?
-  permitExpiry      DateTime?
+  insuranceExpiry DateTime?
+  permitExpiry    DateTime?
 
   bookings TruckBooking[]
 
@@ -572,11 +670,11 @@ model Truck {
 }
 
 model Follow {
-  id      String @id @default(cuid())
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId  String
-  crop    Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
-  cropId  String
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  crop   Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  cropId String
 
   @@unique([userId, cropId])
 }
@@ -611,25 +709,36 @@ model CropRequest {
 }
 
 model Order {
-  id          String          @id @default(cuid())
-  code        String          @unique
-  request     CropRequest?    @relation(fields: [requestId], references: [id])
-  requestId   String?         @unique
-  crop        Crop            @relation(fields: [cropId], references: [id])
-  cropId      String
-  buyer       User            @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  buyerId     String
-  product     String
-  quantityKg  Int
-  pricePerKg  Int
-  value       Int
-  pickup      String
-  destination String
-  harvestDate String
-  transport   TransportChoice @default(BOOK)
-  status      OrderStatus     @default(RESERVED)
-  booking     TruckBooking?
-  createdAt   DateTime        @default(now())
+  id           String          @id @default(cuid())
+  code         String          @unique
+  request      CropRequest?    @relation(fields: [requestId], references: [id])
+  requestId    String?         @unique
+  crop         Crop            @relation(fields: [cropId], references: [id])
+  cropId       String
+  buyer        User            @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId      String
+  product      String
+  quantityKg   Int
+  pricePerKg   Int
+  /// What the farmer is owed: quantity x the agreed price. Never reduced by a fee.
+  value        Int
+  /// The platform fee rate at the moment this order was placed, in basis points.
+  /// Stored rather than recomputed so changing the rate can't rewrite history.
+  feeBps       Int             @default(0)
+  /// The buyer's platform fee in whole rupees. Farmers and drivers are charged nothing.
+  platformFee  Int             @default(0)
+  /// value + platformFee. What the buyer actually pays.
+  totalPayable Int             @default(0)
+  pickup       String
+  destination  String
+  harvestDate  String
+  transport    TransportChoice @default(BOOK)
+  status       OrderStatus     @default(RESERVED)
+  booking      TruckBooking?
+  /// Set when the buyer's payment clears. Nothing is owed to a farmer before this.
+  paidAt       DateTime?
+  createdAt    DateTime        @default(now())
+  payouts      Payout[]
 }
 
 model TruckBooking {
@@ -655,13 +764,13 @@ model TruckBooking {
   proofReceivedBy String?
   cancelReason    String?
 
-  createdAt    DateTime  @default(now())
-  paidAt       DateTime?
-  acceptedAt   DateTime?
-  arrivedAt    DateTime?
-  loadedAt     DateTime?
-  inTransitAt  DateTime?
-  deliveredAt  DateTime?
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+  acceptedAt  DateTime?
+  arrivedAt   DateTime?
+  loadedAt    DateTime?
+  inTransitAt DateTime?
+  deliveredAt DateTime?
 
   events BookingEvent[]
 }

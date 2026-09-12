@@ -2,7 +2,14 @@
 
 A three-sided farm-to-buyer marketplace for Tamil Nadu. Farmers list a harvest, wholesale buyers request a quantity and confirm the price the farmer sets, and local truck drivers move the crop from farm to warehouse. No middlemen.
 
-One React Native (Expo) app serves all three sides, backed by a Node/Postgres API and a web console for admin and support staff.
+**Two apps**, built from one codebase, backed by a Node/Postgres API and a web console for admin and support staff.
+
+| App | For | Package |
+| --- | --- | --- |
+| **Uzhavan** | Farmers and truck drivers — the supply side | `com.uzhavan.app` |
+| **Uzhavan Buy** | Wholesale dealers and buyers | `com.uzhavan.buy` |
+
+Farmers and drivers share one app deliberately: they're often the same household, and one login that can both list a harvest and accept a haul beats two installs. A buyer wants a completely different home screen, which is the split that earns its keep.
 
 **Repo:** [github.com/mrrokesh/Uzhavan](https://github.com/mrrokesh/Uzhavan)
 
@@ -16,7 +23,9 @@ One React Native (Expo) app serves all three sides, backed by a Node/Postgres AP
 | 🌱 **Farmer** | Own a farm, list and price crops, accept or decline requests, watch demand nearby |
 | 🚚 **Driver** | Own a truck, go online, accept jobs, drive the trip forward, capture proof of delivery |
 
-Plus a **web console** for admin and support staff: verification review, account moderation, a support desk, announcements, payment settings and app release control.
+Plus a **web console** for admin and support staff: verification review, account moderation, a support desk, announcements, farmer payouts, payment settings, vehicle tracking and app release control.
+
+Sign into the wrong app and you're told which one you want, rather than shown a broken home screen. Staff and admin accounts are sent to the console — they have no mobile app.
 
 **Each side only controls what it owns.** A buyer cannot accept their own request or advance a trip. A farmer cannot touch another farm's listings. A driver cannot take another driver's job. Staff cannot grant themselves admin. All of it is enforced server-side and covered by tests — not merely hidden in the UI.
 
@@ -55,10 +64,13 @@ Sign in with a staff or admin account. Vite proxies `/api` to the server, so the
 
 ```bash
 npm install
-npx expo start
+npm start            # Uzhavan       — farmers and drivers, port 8082
+npm run start:buy    # Uzhavan Buy   — buyers, port 8083
 ```
 
-Scan the QR with **Expo Go**, or press `a` / `i` for an emulator. Requires Node 22+.
+Scan the QR with **Expo Go**, or press `a` / `i` for an emulator. Requires Node 22+. Both can run at once, on different ports.
+
+Which app a build is comes from `UZHAVAN_APP` in [`app.config.js`](app.config.js), which stamps the name, slug, bundle id and `extra.appKind`. Everything the two share stays in `app.json`, and [`eas.json`](eas.json) carries a store and an internal-APK profile for each.
 
 The app finds the API at `http://<your-machine's-LAN-IP>:4000`, derived from the Expo dev-server host, so a phone on the same Wi-Fi just works. Override with `EXPO_PUBLIC_API_URL` when pointing at a deployed API.
 
@@ -66,9 +78,9 @@ The app finds the API at `http://<your-machine's-LAN-IP>:4000`, derived from the
 <summary><b>Testing on a phone over USB instead of Wi-Fi</b></summary>
 
 ```bash
-adb reverse tcp:8081 tcp:8081 && adb reverse tcp:4000 tcp:4000
-EXPO_PUBLIC_API_URL=http://127.0.0.1:4000 npx expo start
-adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081"
+adb reverse tcp:8082 tcp:8082 && adb reverse tcp:4000 tcp:4000
+npm start
+adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8082"
 ```
 
 Don't pass `--localhost` to `expo start` — it binds Metro to IPv6 only, and `adb reverse` connects over IPv4, so the device gets connection-refused on Metro while the API still works.
@@ -93,13 +105,15 @@ Set `ADMIN_PASSWORD` in `server/.env` before going live and the seed uses that f
 ## Product rules
 
 1. **Price is never final until the farmer says so.** Pre-acceptance figures are labelled *Estimated*, with "Final price confirmed by farmer."
-2. **No payment is collected before the farmer accepts.**
+2. **No payment is collected before the farmer accepts.** Once they have, the buyer pays in full before anything ships — nothing is worth reserving, and no truck worth arranging, until the money is in escrow.
 3. **Status only ever comes from whoever owns it.** A request changes when the real farmer responds; a trip advances when the real driver taps the button. Nothing is faked or on a timer.
 4. **Listings can't oversell.** Confirming an order reserves that quantity, and the listing shows what's still available.
 5. **Transport is optional** and chosen after the order is confirmed — buyers can always use a private truck.
 6. **Trucks that can't carry the load stay in the list**, disabled, with the reason shown.
 7. **Delivery needs proof.** A driver cannot close a trip without recording who received the crop.
-8. **A paid badge is never an identity badge.** *ID Verified* is free and document-backed; *Uzhavan Plus* is a paid subscription with its own separate badge. Selling a trust mark would let a fraudster buy credibility for the price of a subscription.
+8. **Farmers and drivers are never charged.** No commission, no platform fee. The fee is added on top of the price the farmer agreed and paid by the buyer, so a farmer's payout is exactly the number they accepted.
+9. **A farmer's advance is released by the driver, not the farmer.** A farmer saying they shipped is not evidence that they shipped.
+10. **A paid badge is never an identity badge.** *ID Verified* is free and document-backed; *Uzhavan Plus* is a paid subscription with its own separate badge. Selling a trust mark would let a fraudster buy credibility for the price of a subscription.
 
 ---
 
@@ -114,7 +128,9 @@ FARMER   sets the final price → accepts, or declines with a reason
    ↓
 BUYER    confirms → order created, quantity reserved
    ↓
-BUYER    picks from trucks that fit and are online → pays
+BUYER    pays in full → the gateway holds it
+   ↓
+BUYER    picks from trucks that fit and are online
    ↓
 DRIVER   accepts → reached farm → loaded → on the way → delivered + proof
    ↓
@@ -132,6 +148,8 @@ Buyers filter by **distance, price band, category, verified farms only**, and so
 Nearby search uses a built-in table of Tamil Nadu's **38 districts** with centroids, and great-circle distance scaled 1.3× for road detour. Salem → Dindigul comes out at 189 km against ~190 actual; Coimbatore → the Nilgiris at 67 km. Accurate enough for wholesale, where nobody picks a farm on 40 km versus 60.
 
 That choice means **no GPS permission, no geocoding bill and no maps SDK** in the build. Free-text districts resolve through the aliases people actually type — "Attur, Salem", "Ooty", "Trichy", "Tuticorin".
+
+Buyers also get a **Picked for you** row, ranked from what they've actually done — farms they've bought from, categories they keep requesting, distance, verification, readiness. Every card carries the reason it was chosen, and the reason is whichever signal genuinely scored highest rather than a plausible-sounding one added afterwards. No machine learning: with a few hundred buyers there isn't the data for it, and a black box is a poor answer to "why am I seeing this?". Cold start degrades to "verified farms near you with crops ready now" rather than an empty screen.
 
 The demand board is deliberately **aggregate**: volume, average price and accept rate by category, plus a directory of active buyers. An individual request is a private negotiation between one buyer and one farm, and showing it to a competing farm would leak commercial information.
 
@@ -178,8 +196,10 @@ Four are **admin-only and structurally non-delegable** — create/remove staff, 
 | **Accounts** | Search, then suspend / block / restore with a reason the user sees |
 | **Announcements** | Broadcast to farmers, buyers, drivers or everyone; drafts, pinning, expiry |
 | **Settings** | Support phone, email, WhatsApp, hours — read live by the apps |
+| **Track a vehicle** | Plate lookup — driver, papers, lapsed insurance, and what's on board now |
+| **Farmer payouts** | Every slice of money with its stage, due time and state; release or hold with a reason |
 | **App updates** | Force / soft update gating, per app and per platform |
-| **Payments** | Razorpay accounts, swappable if one is blocked |
+| **Payments** | Razorpay accounts, swappable in a click if one is blocked |
 | **Staff** | Create, scope permissions, remove |
 | **Audit log** | Every privileged action, append-only |
 
@@ -199,7 +219,47 @@ Razorpay, over plain REST rather than the SDK — order creation is one POST and
 
 Credentials live in the database with secrets encrypted, **swappable from the console** so a blocked or rotated account is replaced with no deploy. Exactly one account is active at a time; one that has taken payments cannot be deleted. Applying a payment is idempotent, because the webhook and the client callback both land there and either may arrive first.
 
+Mode is read from the key id rather than asked for, so `rzp_live_` can't be mislabelled as test, and switching to a live account confirms with different wording than switching to test. Secrets are write-only: the server never returns one and the console never asks to see it. Removing the last remaining account is allowed — refusing would trap an admin who added a single account with a typo'd key.
+
+Buyer checkout runs Razorpay's hosted page in a WebView. Their React Native SDK is a native module and can't run in Expo Go; the hosted page is the same code path, holds no secret, and the server recomputes the signature before believing any of it.
+
 **Uzhavan Plus** is ₹499 for 12 months, renewals extend rather than reset.
+
+
+---
+
+## Money
+
+**Farmers and drivers pay nothing.** No commission, no platform fee. The fee sits on top of the price the farmer agreed and the buyer pays it, so a farmer's payout is exactly the number they accepted. Buyers see the split before they commit:
+
+```
+Goes to the farmer      ₹40,000
+Platform fee (5%)        ₹2,000
+You pay                 ₹42,000
+```
+
+The rate is set in the console, floored at **5%** and capped at 30% — without a ceiling a typo'd `500` bills someone five times the order. It's held in basis points, because money here is whole rupees and a percentage wants a decimal, and it is **stamped onto each order when placed** rather than recomputed on read. Raising the fee next month must not rewrite what someone already agreed to pay.
+
+### Escrow and payouts
+
+The buyer always pays in full up front, into the gateway. When the farmer sees it is a policy, switchable in the console:
+
+| Policy | Advance | Balance |
+| --- | --- | --- |
+| **`SPLIT_ON_LOAD`** | 30% when the **driver** confirms the load | Rest after delivery |
+| **`AFTER_DELIVERY`** | None | Everything after delivery |
+
+The advance is triggered by the driver, never by the farmer — a third party with no stake in the payout — and is limited to **verified farmers on booked-truck orders**. Someone arranging their own transport has nobody to vouch for them; someone unverified hasn't proved who they are. Both are paid on delivery instead.
+
+Delivery starts a **hold**, not a release. That window is the buyer's chance to dispute, and when it expires the money goes automatically, so a buyer who simply stops replying cannot strand a farmer's payment. A sweeper runs every ten minutes; nobody waiting on money should depend on an admin opening the console.
+
+Built on **Razorpay Route**. Funds never touch our own account, which is what RBI's payment-aggregator rules require. Bank details go straight to Razorpay and are never stored here — only the account id it returns — so a breach of this database leaks nobody's bank account, and the farmer's own screen won't echo the digits back.
+
+Whether Amazon's shape or ours is right depends on returns. They hold everything until after delivery plus a settlement window because a phone can come back three weeks later; produce is judged once, on arrival, and making farmers wait for a risk that doesn't exist is how you lose them to the mandi.
+
+### Who can change it
+
+Support contacts are delegable through `CONFIG_WRITE` — that permission exists so nobody has to ship a release to change a phone number. The platform fee, the payout policy, the advance, the hold and which Razorpay account takes the money are **admin-only and not delegable**. They're all the same class of decision, and none of them should be reachable by a support account under pressure.
 
 ---
 
@@ -220,16 +280,16 @@ If the config request fails the app carries on. A network blip must never lock s
 
 ## Screens
 
-**Buyer** — Home feed with filters · crop detail · farmer profile · select quantity · review request · request details (live) · confirm purchase · book a truck · nearby trucks · review booking · track truck (live) · delivery receipt · My Orders · Profile
+**Buyer** — Home feed with filters · crop detail · farmer profile · select quantity · review request · request details (live) · confirm purchase · **checkout** · book a truck · nearby trucks · review booking · track truck (live) · delivery receipt · My Orders · Profile
 Tabs: **Home · Book Track · My Orders · Profile**
 
-**Farmer** — dashboard · my listings · new/edit listing · request inbox · set price and accept/decline · profile & sales
+**Farmer** — dashboard · my listings · new/edit listing · request inbox · set price and accept/decline · **what buyers want** · **your money** · profile & sales
 Tabs: **Home · My Crops · Requests · Profile**
 
 **Driver** — job board with online toggle · my trips · trip detail with the status stepper · profile & truck settings
 Tabs: **Jobs · My Trips · Profile**
 
-**Shared** — sign in · choose role · create account · verification · help & support · my issues · raise an issue · ticket thread
+**Shared** — sign in · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · wrong-app · reconnect
 
 ---
 
@@ -241,6 +301,7 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | --- | --- |
 | Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` |
 | Profile | `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
+| Suggestions | `GET /crops/suggested?limit=` |
 | Browse | `GET /crops` (`status` `q` `farmId` `following` `district` `radiusKm` `verifiedOnly` `category` `minPrice` `maxPrice` `sort`) · `GET /crops/:id` · `GET /crops/districts` |
 | Verification | `GET/POST /verification` · `GET /verification/documents/:id` · `GET /verification/queue` · `POST /verification/queue/:userId` |
 | Farmer | `GET /farmer/summary` · `PATCH /farmer/farm` · `GET/POST /farmer/crops` · `PATCH/DELETE /farmer/crops/:id` · `GET /farmer/requests` · `POST /farmer/requests/:id/accept｜decline` · `GET /farmer/orders` · `GET /farmer/demand` |
@@ -249,7 +310,8 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | Support | `GET/POST /tickets` · `GET /tickets/:code` · `POST /tickets/:code/reply` · `GET /tickets/desk/queue｜stats` · `POST /tickets/desk/:code/assign｜status` |
 | Announcements | `GET /announcements` · `GET /announcements/unread-count` · `POST /announcements/:id/read` · `POST /announcements/read-all` |
 | Payments | `GET /payments` · `GET /payments/config` · `POST /payments/start｜confirm` · `POST /webhooks/razorpay` |
-| Admin | `GET /admin/me｜permissions｜overview｜audit` · `GET /admin/users` · `POST /admin/users/:id/status` · `GET /admin/track?plate=` · staff, settings, releases, gateways, announcements |
+| Payouts | `GET /payouts` · `POST /payouts/account` |
+| Admin | `GET /admin/me｜permissions｜overview｜audit` · `GET /admin/users` · `POST /admin/users/:id/status` · `GET /admin/track?plate=` · `GET /admin/payouts` · `POST /admin/payouts/:id/override｜sweep` · staff, settings, releases, gateways, announcements |
 | Public | `GET /api/health` · `GET /api/app/config` |
 
 ---
@@ -265,6 +327,7 @@ User ─┬─ Farm ── Crop ──┬── CropRequest ── Order ── 
       ├─ KycDocument                                      │
       ├─ Ticket ── TicketMessage                          │
       ├─ Payment ── PaymentGateway                        │
+      ├─ LinkedAccount            Payout ─────────────────┤
       ├─ AnnouncementRead ── Announcement                 │
       └─────────── (as buyer) ── Order ───────────────────┘
 ```
@@ -302,14 +365,28 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by four end-to-end suites — **199 assertions** — run against a live server and database:
+The API is covered by seven end-to-end suites — **358 assertions** — run against a live server and a real database:
+
+```bash
+cd server
+npm run dev          # in one terminal
+npm run db:reset     # start from a known state
+npm test             # in another
+```
 
 | Suite | Covers |
 | --- | --- |
-| Marketplace (44) | The full loop, role enforcement, stock reservation, truck capacity, driver trip steps |
-| Security (47) | Peppered hashing, encryption at rest, KYC, document access, blocking, live revocation |
-| Admin (63) | Permissions, non-delegable rights, tickets, escalation, remote config, update gating, audit |
-| Discovery & platform (45) | District distance, filters, demand board, driver verification, announcements, payments, vehicle tracking |
+| `e2e` (44) | The full loop, role enforcement, stock reservation, truck capacity, driver trip steps |
+| `sec` (47) | Peppered hashing, encryption at rest, KYC, document access, blocking, live revocation |
+| `admin` (63) | Permissions, non-delegable rights, tickets, escalation, remote config, update gating, audit |
+| `phase` (45) | District distance, filters, demand board, announcements, payments, vehicle tracking |
+| `feat` (96) | Announcement audiences, demand privacy, driver verification, gateway switching, plate lookup |
+| `payout` (41) | Platform fee floor and ceiling, escrow scheduling, payout policy, overrides |
+| `suggest` (22) | Interest signals moving the ranking, exclusions, cold start, honest reasons |
+
+They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
+
+A 503 is retried rather than failed. The API returns it to mean "busy, try again", and a suite that ignored that would measure the database's mood instead of the product.
 
 Typecheck everything:
 
@@ -342,8 +419,11 @@ If the database is shared with other applications, keep `connection_limit` in `D
 
 ## Not done yet
 
-- **Two-app split** — Buyer and Partner as separate builds. `APP_KIND` already reads from `app.json`, so the split is a build-config change rather than a rewrite.
-- **App screens** for Uzhavan Plus, driver verification, the announcements bell and Razorpay checkout — the APIs exist and are tested.
-- **Console screens** for announcements, payment gateways and vehicle tracking — same.
-- **Interest-based suggestions.**
-- **Deployment.** Nothing here is hosted yet.
+- **Uzhavan Plus in the app.** The subscription works server-side; there's no screen to buy it.
+- **A real Razorpay account.** No gateway is configured, so checkout, Route linked accounts and transfers have only ever been exercised against their refusal paths. The suites assert the scheduling and the clean 503 — not a completed payment.
+- **Deployment.** Nothing here is hosted.
+- **Hardware.** The two-app split and everything after it has been verified by typecheck and API tests, not on a physical phone.
+
+### Known operational issue
+
+The Postgres host intermittently returns `53200, out of shared memory` under load — its lock table filling on a box shared with many databases. The API maps that to a retryable 503 rather than a 500, and clients retry, but the real fix is `max_locks_per_transaction` on the server itself. Symptoms are sporadic 503s and occasional seed failures that succeed on a second run.

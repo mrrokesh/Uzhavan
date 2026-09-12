@@ -1,17 +1,13 @@
 {
   "expo": {
-    "name": "Uzhavan",
-    "slug": "uzhavan",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.uzhavan.buyer"
+      "supportsTablet": false
     },
     "android": {
-      "package": "com.uzhavan.buyer",
       "adaptiveIcon": {
         "backgroundColor": "#1B5E3B"
       }

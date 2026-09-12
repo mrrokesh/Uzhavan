@@ -148,6 +148,15 @@ export type ApiRequest = {
   quantityKg: number;
   estimatedValue: number;
   finalPricePerKg: number | null;
+  /**
+   * What the buyer will pay if they confirm. Computed live, because the rate is
+   * only fixed onto the order once it exists. Farmers and drivers pay no fee —
+   * `goodsValue` is the farmer's money and it is never reduced by `platformFee`.
+   */
+  goodsValue?: number;
+  feeBps?: number;
+  platformFee?: number;
+  totalPayable?: number;
   declineReason: string | null;
   status: RequestStatus;
   createdAt: string;
@@ -205,12 +214,20 @@ export type ApiOrder = {
   product: string;
   quantityKg: number;
   pricePerKg: number;
+  /** The farmer's money — quantity x agreed price, never reduced by the fee. */
   value: number;
+  /** The rate that applied when this order was placed, in basis points. */
+  feeBps: number;
+  platformFee: number;
+  /** value + platformFee. What the buyer paid. */
+  totalPayable: number;
   pickup: string;
   destination: string;
   harvestDate: string;
   transport: "BOOK" | "PRIVATE";
   status: OrderStatus;
+  /** Null until the buyer has paid. Nothing is owed to the farmer before this. */
+  paidAt: string | null;
   createdAt: string;
   crop?: ApiCrop;
   buyer?: BuyerBrief;
@@ -421,6 +438,11 @@ export type DocumentType =
   | "GST_CERTIFICATE"
   | "MSME_CERTIFICATE"
   | "PAN_CARD"
+  // Driver / vehicle
+  | "DRIVING_LICENCE"
+  | "VEHICLE_RC"
+  | "VEHICLE_INSURANCE"
+  | "VEHICLE_PERMIT"
   | "OTHER";
 
 export type VerificationState = {
@@ -440,7 +462,7 @@ export type VerificationState = {
     sizeBytes: number;
     uploadedAt: string;
   }[];
-  required: { identifier: "farmerCard" | "gstinOrUdyam"; documents: DocumentType[] };
+  required: { identifier: "farmerCard" | "gstinOrUdyam" | "licence"; documents: DocumentType[] };
 };
 
 export type UploadDoc = {
@@ -448,6 +470,35 @@ export type UploadDoc = {
   filename: string;
   mimeType: string;
   data: string;
+};
+
+/** Everything /verification accepts. Which fields are required depends on role. */
+export type VerificationSubmission = {
+  gstin?: string;
+  udyam?: string;
+  pan?: string;
+  farmerCard?: string;
+  licence?: string;
+  rcNumber?: string;
+  /** ISO date, yyyy-mm-dd. Cover and permit lapse; staff need the dates. */
+  insuranceExpiry?: string;
+  permitExpiry?: string;
+  documents: UploadDoc[];
+};
+
+// ---- Announcements ---------------------------------------------------------
+
+export type Audience = "ALL" | "FARMERS" | "BUYERS" | "DRIVERS";
+
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  audience: Audience;
+  pinned: boolean;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  read: boolean;
 };
 
 // ---- Support tickets -------------------------------------------------------
@@ -542,4 +593,61 @@ export type DemandBoard = {
     orders: number;
     distanceKm: number | null;
   }[];
+};
+
+// ---- Payments and payouts --------------------------------------------------
+
+export type PaymentConfig = {
+  enabled: boolean;
+  keyId: string | null;
+  mode: "TEST" | "LIVE" | null;
+  plus: { amountPaise: number; months: number };
+};
+
+export type PaymentStart = {
+  paymentId: string;
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+  keyId: string;
+  mode: "TEST" | "LIVE";
+};
+
+export type PayoutPolicy = "SPLIT_ON_LOAD" | "AFTER_DELIVERY";
+export type PayoutState = "HELD" | "RELEASED" | "PAID" | "FAILED" | "CANCELLED";
+
+export type Payout = {
+  id: string;
+  stage: "ADVANCE" | "BALANCE";
+  stageLabel: string;
+  state: PayoutState;
+  amount: number;
+  releaseAfter: string | null;
+  releasedAt: string | null;
+  paidAt: string | null;
+  note: string | null;
+  failureReason: string | null;
+  order: { code: string; product: string; quantityKg: number } | null;
+};
+
+export type PayoutLedger = {
+  account: { ready: boolean; addedAt: string } | null;
+  policy: PayoutPolicy;
+  advancePercent: number;
+  holdHours: number;
+  owed: number;
+  received: number;
+  payouts: Payout[];
+};
+
+// ---- Suggestions -----------------------------------------------------------
+
+/** A crop the server picked for this buyer, with why it did. */
+export type SuggestedCrop = ApiCrop & { reason: string };
+
+export type Suggestions = {
+  /** False when there's no history yet and it's going on location alone. */
+  personalised: boolean;
+  count: number;
+  crops: SuggestedCrop[];
 };

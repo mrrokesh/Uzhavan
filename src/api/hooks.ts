@@ -24,6 +24,12 @@ import {
   type TicketThread,
   type UploadDoc,
   type VerificationState,
+  type VerificationSubmission,
+  type Announcement,
+  type PaymentConfig,
+  type PaymentStart,
+  type PayoutLedger,
+  type Suggestions,
 } from "./types";
 
 export const keys = {
@@ -474,17 +480,111 @@ export function useVerification() {
 export function useSubmitVerification() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      gstin?: string;
-      udyam?: string;
-      pan?: string;
-      farmerCard?: string;
-      documents: UploadDoc[];
-    }) => api<{ status: string }>("/verification", { method: "POST", body }),
+    mutationFn: (body: VerificationSubmission) =>
+      api<{ status: string }>("/verification", { method: "POST", body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["verification"] });
       qc.invalidateQueries({ queryKey: keys.me });
     },
+  });
+}
+
+/**
+ * Crops picked for this buyer, each with the reason it was picked. Kept a touch
+ * stale on purpose — the ranking barely moves minute to minute, and a home
+ * screen that reshuffles while you're reading it is worse than a slightly old one.
+ */
+export function useSuggestions(limit = 8) {
+  return useQuery({
+    queryKey: ["suggestions", limit],
+    queryFn: () => api<Suggestions>(`/crops/suggested?limit=${limit}`),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ---- Payments and payouts --------------------------------------------------
+
+export function usePaymentConfig() {
+  return useQuery({
+    queryKey: ["payments", "config"],
+    queryFn: () => api<PaymentConfig>("/payments/config"),
+  });
+}
+
+/** Opens a Razorpay order server-side. The amount is never sent by the client. */
+export function useStartPayment() {
+  return useMutation({
+    mutationFn: (body: {
+      purpose: "CROP_ORDER" | "TRUCK_BOOKING" | "PLUS_SUBSCRIPTION";
+      referenceId?: string;
+    }) => api<PaymentStart>("/payments/start", { method: "POST", body }),
+  });
+}
+
+export function useConfirmPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      signature: string;
+    }) => api<{ status: string }>("/payments/confirm", { method: "POST", body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.orders });
+      qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+/** The farmer's own ledger: what's owed, what's landed, and when. */
+export function usePayouts() {
+  return useQuery({
+    queryKey: ["payouts"],
+    queryFn: () => api<PayoutLedger>("/payouts"),
+  });
+}
+
+export function useAddPayoutAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { accountNumber: string; ifsc: string; beneficiaryName: string }) =>
+      api<{ ready: boolean; addedAt: string }>("/payouts/account", { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payouts"] }),
+  });
+}
+
+// ---- Announcements ---------------------------------------------------------
+
+export function useAnnouncements() {
+  return useQuery({
+    queryKey: ["announcements"],
+    queryFn: () => api<Announcement[]>("/announcements"),
+  });
+}
+
+/** Drives the bell badge. Cheap enough to poll; it's a single count query. */
+export function useUnreadAnnouncements() {
+  return useQuery({
+    queryKey: ["announcements", "unread"],
+    queryFn: () => api<{ count: number }>("/announcements/unread-count"),
+    refetchInterval: 120_000,
+  });
+}
+
+export function useMarkAnnouncementRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ read: boolean }>(`/announcements/${id}/read`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
+  });
+}
+
+export function useMarkAllAnnouncementsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ marked: number }>("/announcements/read-all", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
   });
 }
 

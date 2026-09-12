@@ -54,6 +54,22 @@ export function errorHandler(
       .json({ error: "Can’t reach the server right now. Check your connection and try again." });
   }
 
+  // Postgres itself under pressure rather than a bug in the query. 53200 is
+  // "out of shared memory" (lock table exhausted — max_locks_per_transaction on
+  // a shared host), 53300 too many connections, 53400 too many locks. These are
+  // transient by nature, so return a retryable 503 rather than a 500 that tells
+  // the client to give up on a request that would succeed a second later.
+  const pgCode: string | undefined =
+    err instanceof Prisma.PrismaClientUnknownRequestError
+      ? (/code: "(\d{5})"/.exec(String(err.message))?.[1] ?? undefined)
+      : undefined;
+  if (pgCode && ["53200", "53300", "53400"].includes(pgCode)) {
+    console.error(`Postgres out of resources (${pgCode})`);
+    return res
+      .status(503)
+      .json({ error: "The server is busy right now. Try that again in a moment." });
+  }
+
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") return res.status(409).json({ error: "That record already exists" });
     if (err.code === "P2025") return res.status(404).json({ error: "Not found" });
