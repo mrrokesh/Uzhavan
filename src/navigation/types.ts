@@ -1,13 +1,14 @@
 import type { Role } from "../api/types";
 
 
-/** Screens every role can reach from their profile tab. */
+/** Screens every role can reach from their profile tab or the bell. */
 export type SharedScreens = {
   Verification: undefined;
   Help: undefined;
   MyTickets: undefined;
   NewTicket: undefined;
   TicketDetail: { code: string };
+  Announcements: undefined;
 };
 
 export type AuthStackParamList = {
@@ -51,6 +52,7 @@ export type FarmerStackParamList = SharedScreens & {
   FarmerTabs: undefined;
   CropForm: { cropId?: string };
   FarmerRequestDetail: { requestId: string };
+  Demand: undefined;
 };
 
 export type FarmerTabParamList = {

@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../../components/Chrome";
 import { Logo } from "../../components/Logo";
 import { Chip } from "../../components/ui";
+import { NotificationBell } from "../../components/NotificationBell";
 import { useFarmerOrders, useFarmerSummary } from "../../api/hooks";
 import { imageFor } from "../../lib/images";
 import { inr, kg } from "../../lib/format";
@@ -32,10 +33,7 @@ export function FarmerHome() {
       <ScrollView contentContainerStyle={styles.pad}>
         <View style={styles.top}>
           <Logo />
-          <View style={styles.bell}>
-            <Ionicons name="notifications-outline" size={18} color={colors.ink} />
-            {s && s.pendingRequests > 0 ? <View style={styles.dot} /> : null}
-          </View>
+          <NotificationBell />
         </View>
 
         <View style={styles.hero}>
@@ -72,6 +70,19 @@ export function FarmerHome() {
         <Pressable style={styles.cta} onPress={() => navigation.navigate("CropForm", {})}>
           <Ionicons name="add-circle-outline" size={20} color={colors.white} />
           <Text style={styles.ctaText}>List a new crop</Text>
+        </Pressable>
+
+        <Pressable style={styles.demand} onPress={() => navigation.navigate("Demand")}>
+          <View style={styles.demandIcon}>
+            <Ionicons name="trending-up-outline" size={18} color={colors.forest} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.demandTitle}>What buyers want</Text>
+            <Text style={styles.demandSub}>
+              Which crops buyers near you are asking for, and what they pay.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.faint} />
         </Pressable>
 
         <Text style={styles.sectionTitle}>Recent orders</Text>
@@ -114,8 +125,6 @@ function Stat({ n, l }: { n: string; l: string }) {
 const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16, paddingBottom: 32 },
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bell: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
-  dot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger },
   hero: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12 },
   h1: { fontSize: 22, fontWeight: "700", color: colors.ink },
   avatar: { width: 56, height: 56, borderRadius: 28 },
@@ -128,6 +137,10 @@ const styles = StyleSheet.create({
   stat: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 14, alignItems: "center", ...shadow },
   statN: { fontSize: 19, fontWeight: "700", color: colors.forest },
   cta: { marginTop: 20, height: 52, borderRadius: 12, backgroundColor: colors.forest, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  demand: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
+  demandIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center" },
+  demandTitle: { fontSize: 14.5, fontWeight: "600", color: colors.ink },
+  demandSub: { marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.muted },
   ctaText: { color: colors.white, fontSize: 15, fontWeight: "600" },
   sectionTitle: { marginTop: 28, fontSize: 15, fontWeight: "600", color: colors.ink },
   empty: { marginTop: 16, fontSize: 13, color: colors.muted },
