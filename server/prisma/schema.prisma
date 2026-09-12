@@ -1,0 +1,677 @@
+// Uzhavan — three-sided farm-to-buyer marketplace
+// PostgreSQL + Prisma.
+//
+// Roles:
+//   BUYER   browses crops, requests quantities, confirms orders, books trucks
+//   FARMER  owns a Farm, lists Crops, accepts/declines buyer requests
+//   DRIVER  owns a Truck, accepts bookings, drives the trip status forward
+//
+// Image fields hold string keys the mobile app maps to bundled assets
+// (see src/lib/images.ts on the client).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  BUYER
+  FARMER
+  DRIVER
+  STAFF
+  ADMIN
+}
+
+/// Whether the account may use the app at all. Set by admin/staff, e.g. when
+/// a seller takes payment and never delivers.
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+}
+
+/// KYC state. Only VERIFIED accounts get the badge other users can see.
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DocumentType {
+  FARMER_CARD
+  LAND_RECORD
+  GST_CERTIFICATE
+  MSME_CERTIFICATE
+  PAN_CARD
+  // Driver / vehicle
+  DRIVING_LICENCE
+  VEHICLE_RC
+  VEHICLE_INSURANCE
+  VEHICLE_PERMIT
+  OTHER
+}
+
+/// Who an announcement is aimed at.
+enum Audience {
+  ALL
+  FARMERS
+  BUYERS
+  DRIVERS
+}
+
+enum PaymentPurpose {
+  TRUCK_BOOKING
+  PLUS_SUBSCRIPTION
+}
+
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMode {
+  TEST
+  LIVE
+}
+
+/// Module-level rights an admin can hand to a staff member.
+/// The four ADMIN_* entries are deliberately not grantable — see
+/// ADMIN_ONLY in src/permissions.ts.
+enum Permission {
+  USERS_VIEW
+  USERS_MODERATE
+  KYC_REVIEW
+  TICKETS_VIEW
+  TICKETS_RESPOND
+  TICKETS_ASSIGN
+  ORDERS_VIEW
+  CROPS_MODERATE
+  CONFIG_WRITE
+  ADMIN_STAFF_MANAGE
+  ADMIN_PERMISSIONS_GRANT
+  ADMIN_APP_RELEASE
+  ADMIN_AUDIT_VIEW
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_ON_USER
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  ORDER
+  PAYMENT
+  DELIVERY
+  ACCOUNT
+  VERIFICATION
+  APP_ISSUE
+  OTHER
+}
+
+enum AppKind {
+  BUYER
+  PARTNER
+}
+
+enum Platform {
+  ANDROID
+  IOS
+}
+
+enum CropStatus {
+  upcoming
+  ready
+}
+
+enum RequestStatus {
+  PENDING
+  FARMER_ACCEPTED
+  FARMER_DECLINED
+  CONFIRMED
+  BUYER_DECLINED
+  CANCELLED
+}
+
+enum TransportChoice {
+  BOOK
+  PRIVATE
+}
+
+enum OrderStatus {
+  RESERVED
+  AWAITING_TRUCK
+  IN_TRANSIT
+  DELIVERED
+}
+
+/// Driver-driven trip states. REQUESTED..PAID are buyer-side; from
+/// ACCEPTED onward only the assigned driver advances the booking.
+enum BookingStatus {
+  PENDING
+  PAID
+  ACCEPTED
+  ARRIVED_PICKUP
+  LOADED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id           String @id @default(cuid())
+  email        String @unique
+  /// Peppered bcrypt, stored as "v<pepperVersion>$<bcrypt>". See src/crypto.ts.
+  passwordHash String
+  role         Role
+  name         String
+  phone        String
+  avatarKey    String @default("buyer")
+
+  // Buyer profile (null for farmers / drivers)
+  business         String?
+  district         String?
+  /// Resolved district for the buyer's warehouse — the default origin when
+  /// they search "near me".
+  districtKey      String?
+  warehouse        String?
+  warehouseAddress String?
+  market           String?
+
+  // --- Account standing ---
+  status            AccountStatus @default(ACTIVE)
+  statusReason      String?
+  statusChangedAt   DateTime?
+  statusChangedBy   User?         @relation("StatusModerator", fields: [statusChangedById], references: [id])
+  statusChangedById String?
+  moderated         User[]        @relation("StatusModerator")
+
+  // --- KYC ---
+  verification            VerificationStatus @default(UNVERIFIED)
+  verificationSubmittedAt DateTime?
+  verificationReviewedAt  DateTime?
+  verificationReviewedBy  User?              @relation("KycReviewer", fields: [verificationReviewedById], references: [id])
+  verificationReviewedById String?
+  reviewed                User[]             @relation("KycReviewer")
+  rejectionReason         String?
+
+  /// Business/farm identifiers, AES-256-GCM encrypted at rest. The matching
+  /// *Index columns are deterministic HMACs so we can enforce uniqueness and
+  /// look a value up without ever storing the plaintext.
+  gstinEnc        String?
+  gstinIndex      String? @unique
+  udyamEnc        String?
+  udyamIndex      String? @unique
+  panEnc          String?
+  farmerCardEnc   String?
+  farmerCardIndex String? @unique
+  /// Driving licence, encrypted like the other identifiers.
+  licenceEnc      String?
+  licenceIndex    String? @unique
+  /// Last 4 characters, kept in the clear purely so the owner recognises it.
+  idLast4         String?
+
+  /// Uzhavan Plus — a paid subscription, deliberately separate from KYC.
+  /// A paid badge must never be mistaken for "we checked who this is".
+  plusUntil DateTime?
+
+  documents KycDocument[] @relation("DocumentOwner")
+
+  /// Granted rights. Empty for ordinary users; ADMIN implicitly holds all.
+  permissions Permission[] @default([])
+
+  farm     Farm?
+  driver   Driver?
+  requests CropRequest[]
+  orders   Order[]
+  follows  Follow[]
+  saves    SavedCrop[]
+
+  payments          Payment[]
+  announcementsRead AnnouncementRead[]
+  announcementsMade Announcement[]  @relation("AnnouncementAuthor")
+  ticketsRaised    Ticket[]        @relation("TicketRaiser")
+  ticketsAssigned  Ticket[]        @relation("TicketAssignee")
+  ticketMessages   TicketMessage[]
+  auditEntries     AuditLog[]      @relation("AuditActor")
+  settingsChanged  AppSetting[]
+  releasesPublished AppRelease[]
+
+  createdAt DateTime @default(now())
+
+  @@index([verification])
+  @@index([status])
+  @@index([role])
+}
+
+/// Support ticket raised by a farmer, buyer or driver.
+model Ticket {
+  id   String @id @default(cuid())
+  /// Short, human-quotable reference: UZ-7F3K2
+  code String @unique
+
+  raisedBy   User   @relation("TicketRaiser", fields: [raisedById], references: [id], onDelete: Cascade)
+  raisedById String
+
+  assignedTo   User?     @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  assignedToId String?
+  assignedAt   DateTime?
+
+  category TicketCategory
+  priority TicketPriority @default(NORMAL)
+  status   TicketStatus   @default(OPEN)
+  subject  String
+
+  /// Optional reference to whatever the ticket is about.
+  orderCode String?
+
+  messages TicketMessage[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  /// Set when the 24-hour sweeper had to force-assign this.
+  escalatedAt     DateTime?
+
+  @@index([status])
+  @@index([assignedToId])
+  @@index([raisedById])
+  @@index([status, createdAt])
+}
+
+model TicketMessage {
+  id       String @id @default(cuid())
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+  body     String
+  /// Staff-only note; never shown to the person who raised the ticket.
+  internal Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+/// Runtime configuration the admin edits instead of asking for a code change —
+/// support phone, support email, and anything similar added later.
+model AppSetting {
+  key         String   @id
+  value       String
+  label       String
+  description String?
+  /// Readable by unauthenticated apps (e.g. the support number on a login screen).
+  isPublic    Boolean  @default(false)
+
+  updatedAt   DateTime @updatedAt
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+  updatedById String?
+}
+
+/// Version gate per app + platform. The apps check this on boot.
+model AppRelease {
+  id       String   @id @default(cuid())
+  app      AppKind
+  platform Platform
+
+  /// Newest published build. Below this → soft prompt.
+  latestVersion       String
+  /// Oldest build still allowed to run. Below this → hard block.
+  minSupportedVersion String
+  releaseNotes        String?
+  storeUrl            String?
+  /// Force every build below `latestVersion`, not just those below the minimum.
+  mandatory           Boolean  @default(false)
+
+  updatedAt   DateTime @updatedAt
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+  updatedById String?
+
+  @@unique([app, platform])
+}
+
+/// Broadcast from the admin console to one or more sides of the marketplace.
+model Announcement {
+  id       String   @id @default(cuid())
+  title    String
+  body     String
+  audience Audience @default(ALL)
+  /// Pinned announcements stay at the top until they expire.
+  pinned   Boolean  @default(false)
+
+  publishedAt DateTime?
+  expiresAt   DateTime?
+
+  author   User?   @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  authorId String?
+
+  reads AnnouncementRead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([audience, publishedAt])
+}
+
+/// One row per person who has seen an announcement, so the bell can show a
+/// genuine unread count rather than a guess.
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  announcementId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+}
+
+/// Razorpay credentials, swappable from the console so a blocked or rotated
+/// account can be replaced without a deploy. Secrets are AES-256-GCM encrypted.
+model PaymentGateway {
+  id           String      @id @default(cuid())
+  label        String
+  mode         PaymentMode @default(TEST)
+  keyId        String
+  keySecretEnc String
+  webhookSecretEnc String?
+  /// Exactly one gateway is active at a time; activating another stands this down.
+  active       Boolean     @default(false)
+
+  payments  Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
+model Payment {
+  id      String         @id @default(cuid())
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  purpose PaymentPurpose
+  status  PaymentStatus  @default(CREATED)
+
+  /// Paise, as Razorpay counts it — never floats for money.
+  amountPaise Int
+  currency    String @default("INR")
+
+  gateway   PaymentGateway? @relation(fields: [gatewayId], references: [id])
+  gatewayId String?
+  mode      PaymentMode     @default(TEST)
+
+  razorpayOrderId   String  @unique
+  razorpayPaymentId String?
+  /// What the payment was for, e.g. a booking id.
+  referenceId       String?
+  failureReason     String?
+
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+/// Append-only record of privileged actions, so "who blocked this seller" and
+/// "who approved this KYC" always have an answer.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  summary    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@index([actorId])
+}
+
+/// Uploaded proof of identity. Kept in its own table so a 3 MB blob is never
+/// dragged into an ordinary user query, and encrypted so a database dump
+/// doesn't leak government IDs.
+model KycDocument {
+  id       String       @id @default(cuid())
+  owner    User         @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId  String
+  type     DocumentType
+  filename String
+  mimeType String
+  /// Size of the original file, before encryption.
+  sizeBytes Int
+  /// AES-256-GCM: [12-byte IV][16-byte tag][ciphertext]
+  data     Bytes
+  /// SHA-256 of the plaintext, to spot duplicate uploads.
+  checksum String
+
+  uploadedAt DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+model Farm {
+  id        String @id @default(cuid())
+  owner     User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String @unique
+  name      String
+  ownerName String
+  district  String
+  /// Free-text `district` resolved to one of Tamil Nadu's 38 districts, so
+  /// radius filtering runs as an indexed IN rather than in memory.
+  /// See src/data/districts.ts.
+  districtKey String?
+  location  String
+  rating    Float  @default(5)
+  avatarKey String @default("arul")
+  crops     Crop[]
+  createdAt DateTime @default(now())
+
+  @@index([districtKey])
+}
+
+model Crop {
+  id               String     @id @default(cuid())
+  farm             Farm       @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farmId           String
+  headline         String
+  title            String
+  status           CropStatus
+  statusLabel      String
+  expectedKg       Int
+  /// Reduced as buyers confirm orders, so listings can't oversell.
+  reservedKg       Int        @default(0)
+  grade            String
+  pricePerKg       Int
+  harvestDate      String
+  harvestDateShort String
+  category         String
+  minOrderKg       Int
+  about            String
+  hasVideo         Boolean    @default(false)
+  imageKey         String
+  galleryKeys      String[]
+  /// Farmer can unlist without deleting history.
+  listed           Boolean    @default(true)
+
+  requests  CropRequest[]
+  orders    Order[]
+  follows   Follow[]
+  saves     SavedCrop[]
+  createdAt DateTime @default(now())
+}
+
+model Driver {
+  id       String  @id @default(cuid())
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String  @unique
+  name     String
+  rating   Float   @default(5)
+  trips    Int     @default(0)
+  photoKey String  @default("selvam")
+  verified Boolean @default(true)
+  /// Driver goes offline to stop receiving jobs.
+  online   Boolean @default(true)
+
+  truck    Truck?
+  bookings TruckBooking[]
+}
+
+model Truck {
+  id           String  @id @default(cuid())
+  driver       Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId     String  @unique
+  name         String
+  meta         String
+  capacityTons Float
+  capacityKg   Int
+  etaMin       Int     @default(15)
+  price        Int
+  photoKey     String  @default("truck")
+  recommended  Boolean @default(false)
+  body         String
+  plate        String
+  /// Plate with spaces and hyphens stripped, uppercased. People type
+  /// "TN30AB4821", "tn 30 ab 4821" and "TN-30-AB-4821" for the same vehicle,
+  /// so searches run against this rather than the display form.
+  plateKey     String?
+
+  /// Registration certificate number. Not secret — it is on the vehicle.
+  rcNumber          String?
+  /// Cover and permit both lapse, and an expired one means the truck must not
+  /// carry goods. Staff see these on the verification queue.
+  insuranceExpiry   DateTime?
+  permitExpiry      DateTime?
+
+  bookings TruckBooking[]
+
+  @@index([plateKey])
+}
+
+model Follow {
+  id      String @id @default(cuid())
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  crop    Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  cropId  String
+
+  @@unique([userId, cropId])
+}
+
+model SavedCrop {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  crop   Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  cropId String
+
+  @@unique([userId, cropId])
+}
+
+model CropRequest {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  crop            Crop          @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  cropId          String
+  buyer           User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId         String
+  quantityKg      Int
+  estimatedValue  Int
+  finalPricePerKg Int?
+  /// Set by the farmer when declining, shown to the buyer.
+  declineReason   String?
+  status          RequestStatus @default(PENDING)
+  order           Order?
+  createdAt       DateTime      @default(now())
+  respondedAt     DateTime?
+  confirmedAt     DateTime?
+}
+
+model Order {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  request     CropRequest?    @relation(fields: [requestId], references: [id])
+  requestId   String?         @unique
+  crop        Crop            @relation(fields: [cropId], references: [id])
+  cropId      String
+  buyer       User            @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId     String
+  product     String
+  quantityKg  Int
+  pricePerKg  Int
+  value       Int
+  pickup      String
+  destination String
+  harvestDate String
+  transport   TransportChoice @default(BOOK)
+  status      OrderStatus     @default(RESERVED)
+  booking     TruckBooking?
+  createdAt   DateTime        @default(now())
+}
+
+model TruckBooking {
+  id       String @id @default(cuid())
+  code     String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  truck    Truck  @relation(fields: [truckId], references: [id])
+  truckId  String
+  driver   Driver @relation(fields: [driverId], references: [id])
+  driverId String
+
+  pickup        String
+  destination   String
+  distanceKm    Int    @default(57)
+  baseFare      Int
+  loadingFee    Int
+  protectionFee Int
+  total         Int
+  paymentMethod String @default("UPI")
+
+  status          BookingStatus @default(PENDING)
+  proofReceivedBy String?
+  cancelReason    String?
+
+  createdAt    DateTime  @default(now())
+  paidAt       DateTime?
+  acceptedAt   DateTime?
+  arrivedAt    DateTime?
+  loadedAt     DateTime?
+  inTransitAt  DateTime?
+  deliveredAt  DateTime?
+
+  events BookingEvent[]
+}
+
+/// Append-only trip timeline the buyer's tracking screen renders.
+model BookingEvent {
+  id        String        @id @default(cuid())
+  booking   TruckBooking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String
+  status    BookingStatus
+  note      String?
+  createdAt DateTime      @default(now())
+}
