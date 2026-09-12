@@ -26,6 +26,9 @@ import {
   type VerificationState,
   type VerificationSubmission,
   type Announcement,
+  type PaymentConfig,
+  type PaymentStart,
+  type PayoutLedger,
 } from "./types";
 
 export const keys = {
@@ -482,6 +485,57 @@ export function useSubmitVerification() {
       qc.invalidateQueries({ queryKey: ["verification"] });
       qc.invalidateQueries({ queryKey: keys.me });
     },
+  });
+}
+
+// ---- Payments and payouts --------------------------------------------------
+
+export function usePaymentConfig() {
+  return useQuery({
+    queryKey: ["payments", "config"],
+    queryFn: () => api<PaymentConfig>("/payments/config"),
+  });
+}
+
+/** Opens a Razorpay order server-side. The amount is never sent by the client. */
+export function useStartPayment() {
+  return useMutation({
+    mutationFn: (body: {
+      purpose: "CROP_ORDER" | "TRUCK_BOOKING" | "PLUS_SUBSCRIPTION";
+      referenceId?: string;
+    }) => api<PaymentStart>("/payments/start", { method: "POST", body }),
+  });
+}
+
+export function useConfirmPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      signature: string;
+    }) => api<{ status: string }>("/payments/confirm", { method: "POST", body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.orders });
+      qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+/** The farmer's own ledger: what's owed, what's landed, and when. */
+export function usePayouts() {
+  return useQuery({
+    queryKey: ["payouts"],
+    queryFn: () => api<PayoutLedger>("/payouts"),
+  });
+}
+
+export function useAddPayoutAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { accountNumber: string; ifsc: string; beneficiaryName: string }) =>
+      api<{ ready: boolean; addedAt: string }>("/payouts/account", { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payouts"] }),
   });
 }
 

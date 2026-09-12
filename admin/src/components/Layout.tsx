@@ -58,6 +58,7 @@ export function Layout() {
           )}
           {can("USERS_VIEW") && <NavLink to="/accounts">Accounts</NavLink>}
           {can("ORDERS_VIEW") && <NavLink to="/tracking">Track a vehicle</NavLink>}
+          {can("ORDERS_VIEW") && <NavLink to="/payouts">Farmer payouts</NavLink>}
 
           <div className="nav-section">Platform</div>
           <NavLink to="/settings">Settings</NavLink>

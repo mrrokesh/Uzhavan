@@ -226,6 +226,8 @@ export type ApiOrder = {
   harvestDate: string;
   transport: "BOOK" | "PRIVATE";
   status: OrderStatus;
+  /** Null until the buyer has paid. Nothing is owed to the farmer before this. */
+  paidAt: string | null;
   createdAt: string;
   crop?: ApiCrop;
   buyer?: BuyerBrief;
@@ -591,4 +593,49 @@ export type DemandBoard = {
     orders: number;
     distanceKm: number | null;
   }[];
+};
+
+// ---- Payments and payouts --------------------------------------------------
+
+export type PaymentConfig = {
+  enabled: boolean;
+  keyId: string | null;
+  mode: "TEST" | "LIVE" | null;
+  plus: { amountPaise: number; months: number };
+};
+
+export type PaymentStart = {
+  paymentId: string;
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+  keyId: string;
+  mode: "TEST" | "LIVE";
+};
+
+export type PayoutPolicy = "SPLIT_ON_LOAD" | "AFTER_DELIVERY";
+export type PayoutState = "HELD" | "RELEASED" | "PAID" | "FAILED" | "CANCELLED";
+
+export type Payout = {
+  id: string;
+  stage: "ADVANCE" | "BALANCE";
+  stageLabel: string;
+  state: PayoutState;
+  amount: number;
+  releaseAfter: string | null;
+  releasedAt: string | null;
+  paidAt: string | null;
+  note: string | null;
+  failureReason: string | null;
+  order: { code: string; product: string; quantityKg: number } | null;
+};
+
+export type PayoutLedger = {
+  account: { ready: boolean; addedAt: string } | null;
+  policy: PayoutPolicy;
+  advancePercent: number;
+  holdHours: number;
+  owed: number;
+  received: number;
+  payouts: Payout[];
 };

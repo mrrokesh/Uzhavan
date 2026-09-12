@@ -37,6 +37,7 @@ export type RootStackParamList = SharedScreens & {
   ReviewBooking: { orderId: string; truckId: string };
   TrackTruck: { bookingId: string };
   DeliveryCompleted: { bookingId: string };
+  Checkout: { orderId: string };
 };
 
 export type TabParamList = {
@@ -53,6 +54,7 @@ export type FarmerStackParamList = SharedScreens & {
   CropForm: { cropId?: string };
   FarmerRequestDetail: { requestId: string };
   Demand: undefined;
+  FarmerPayouts: undefined;
 };
 
 export type FarmerTabParamList = {
