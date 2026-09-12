@@ -67,6 +67,38 @@ enum Audience {
 enum PaymentPurpose {
   TRUCK_BOOKING
   PLUS_SUBSCRIPTION
+  CROP_ORDER
+}
+
+/// How a farmer gets paid once the buyer has paid in full. Set in the admin
+/// console; see src/payouts.ts.
+enum PayoutPolicy {
+  /// An advance the moment the driver confirms the load, balance on delivery.
+  /// Faster for the farmer, and the trigger is a third party rather than the
+  /// farmer's own word.
+  SPLIT_ON_LOAD
+  /// Nothing until delivered, then a settlement hold before release — the
+  /// Amazon / Flipkart shape. Slowest for the farmer, safest for disputes.
+  AFTER_DELIVERY
+}
+
+enum PayoutStage {
+  /// Released against the load being picked up.
+  ADVANCE
+  /// Everything still owed after any advance.
+  BALANCE
+}
+
+enum PayoutState {
+  /// Scheduled, not yet due.
+  HELD
+  /// Due and sent to the gateway.
+  RELEASED
+  /// Gateway confirmed the farmer has the money.
+  PAID
+  FAILED
+  /// Order cancelled or refunded before release.
+  CANCELLED
 }
 
 enum PaymentStatus {
@@ -245,6 +277,9 @@ model User {
   saves    SavedCrop[]
 
   payments          Payment[]
+  linkedAccount     LinkedAccount?
+  payouts           Payout[]           @relation("PayoutFarmer")
+  payoutOverrides   Payout[]           @relation("PayoutOverride")
   announcementsRead AnnouncementRead[]
   announcementsMade Announcement[]     @relation("AnnouncementAuthor")
   ticketsRaised     Ticket[]           @relation("TicketRaiser")
@@ -429,8 +464,71 @@ model Payment {
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
+  payouts Payout[]
+
   @@index([userId])
   @@index([status])
+}
+
+/// A farmer's Razorpay Route account. Buyer money never sits in our own
+/// current account — RBI's payment-aggregator rules don't allow that — so the
+/// gateway holds it and we tell it when to let go.
+model LinkedAccount {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  /// Razorpay's account id, acc_XXXXXXXX.
+  routeAccountId String      @unique
+  mode           PaymentMode @default(TEST)
+  /// Set once Razorpay says the account can receive settlements.
+  activatedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// One slice of a farmer's money for one order. The buyer always pays the full
+/// amount up front; these rows decide when the farmer sees it.
+model Payout {
+  id      String @id @default(cuid())
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  /// The farmer being paid, not the farm — payouts follow the account.
+  farmer   User   @relation("PayoutFarmer", fields: [farmerId], references: [id], onDelete: Cascade)
+  farmerId String
+
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+  paymentId String?
+
+  stage  PayoutStage
+  state  PayoutState  @default(HELD)
+  /// Whole rupees, as the rest of the app counts money.
+  amount Int
+  /// The policy this was scheduled under, kept so changing the policy later
+  /// can't rewrite what an existing order was promised.
+  policy PayoutPolicy
+
+  /// When the sweeper may release it. Null means "not until an event says so".
+  releaseAfter DateTime?
+  releasedAt   DateTime?
+  paidAt       DateTime?
+
+  /// Razorpay Route transfer id, trf_XXXXXXXX.
+  routeTransferId String?
+  failureReason   String?
+  /// Set when a human released this early or held it back.
+  overriddenBy    User?   @relation("PayoutOverride", fields: [overriddenById], references: [id])
+  overriddenById  String?
+  note            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([state, releaseAfter])
+  @@index([farmerId])
+  @@index([orderId])
 }
 
 /// Append-only record of privileged actions, so "who blocked this seller" and
@@ -637,7 +735,10 @@ model Order {
   transport    TransportChoice @default(BOOK)
   status       OrderStatus     @default(RESERVED)
   booking      TruckBooking?
+  /// Set when the buyer's payment clears. Nothing is owed to a farmer before this.
+  paidAt       DateTime?
   createdAt    DateTime        @default(now())
+  payouts      Payout[]
 }
 
 model TruckBooking {

@@ -5,6 +5,8 @@ import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { errorHandler, notFound } from "./http.js";
 import { startTicketSweeper } from "./tickets/assignment.js";
+import { startPayoutSweeper } from "./payouts.js";
+import { payoutsRouter, adminPayoutsRouter } from "./routes/payouts.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
 import { verificationRouter } from "./routes/verification.js";
@@ -57,6 +59,8 @@ app.use("/api/app", appRouter);
 app.use("/api/tickets", ticketsRouter);
 app.use("/api/announcements", announcementsRouter);
 app.use("/api/payments", paymentsRouter);
+app.use("/api/payouts", payoutsRouter);
+app.use("/api/admin", adminPayoutsRouter);
 app.use("/api/admin/announcements", adminAnnouncementsRouter);
 app.use("/api/admin", gatewayRouter);
 app.use("/api/admin", moderationRouter);
@@ -80,9 +84,12 @@ const server = app.listen(env.port, () => {
 
 // Force-assigns tickets left unattended past TICKET_ESCALATION_HOURS.
 const sweeper = startTicketSweeper();
+// Farmers waiting on money must not depend on an admin opening the console.
+const payoutSweeper = startPayoutSweeper();
 
 async function shutdown() {
   clearInterval(sweeper);
+  clearInterval(payoutSweeper);
   server.close();
   await prisma.$disconnect();
   process.exit(0);
