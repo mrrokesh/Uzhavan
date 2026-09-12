@@ -651,3 +651,41 @@ export type Suggestions = {
   count: number;
   crops: SuggestedCrop[];
 };
+
+// ---- Reviews ---------------------------------------------------------------
+
+export type ReviewSubject = "FARM" | "DRIVER" | "BUYER";
+
+export type ReviewableSubject = {
+  subject: ReviewSubject;
+  id: string;
+  name: string;
+  existing: { stars: number; comment: string | null } | null;
+};
+
+export type Reviewable = {
+  orderCode: string;
+  delivered: boolean;
+  canReview: boolean;
+  subjects: ReviewableSubject[];
+};
+
+export type Review = {
+  id: string;
+  stars: number;
+  comment: string | null;
+  createdAt: string;
+  product: string;
+  /** First name only — a full business name beside one star is a grudge. */
+  author: string;
+  district: string | null;
+};
+
+export type Reputation = {
+  /** Null when nobody has reviewed yet. Not the same as zero. */
+  rating: number | null;
+  count: number;
+  /** False until there are enough reviews for the average to mean anything. */
+  established: boolean;
+  reviews: Review[];
+};

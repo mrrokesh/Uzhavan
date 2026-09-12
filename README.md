@@ -155,6 +155,26 @@ The demand board is deliberately **aggregate**: volume, average price and accept
 
 ---
 
+## Reputation
+
+Every review hangs off a completed order. An unattached review is one anybody can write about anybody, which is how a ratings system stops meaning anything — here you can only rate a counterparty you actually traded with, once, after the crop arrived.
+
+Three directions, because all three parties take a risk:
+
+| Who | Rates | On |
+| --- | --- | --- |
+| Buyer | The farm | Was the crop what was described? |
+| Buyer | The driver | Did it arrive, on time, intact? |
+| Farmer | The buyer | Did they take the load and pay for it? |
+
+That last one matters more than it looks. A marketplace where only customers rate suppliers gives suppliers no way to warn each other about a buyer who cancels on arrival.
+
+A rating can be revised — a first reaction written on the day of a late delivery isn't always the fair one — but it stays one verdict per trade, so a single deal can never move an average as far as two. Averages are recomputed from the reviews rather than adjusted incrementally, because an incremental counter that drifts is worse than no counter. Below three reviews an average is noise dressed as a number, so the app shows "new" instead of a confident 5.0 off one opinion, and the suggestion ranking ignores it entirely.
+
+Reviews show a first name and a district, never a full business name. A wholesale buyer's name beside a one-star review is a grudge with an address on it.
+
+---
+
 ## Verification & trust
 
 | Role | Identifier | Documents |
@@ -324,6 +344,7 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` · `POST /auth/password/forgot｜reset` |
 | Profile | `PUT/DELETE /me/push-token` · `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
 | Suggestions | `GET /crops/suggested?limit=` |
+| Reviews | `GET/POST /orders/:id/reviews` · `GET /reviews/:subject/:subjectId` |
 | Browse | `GET /crops` (`status` `q` `farmId` `following` `district` `radiusKm` `verifiedOnly` `category` `minPrice` `maxPrice` `sort`) · `GET /crops/:id` · `GET /crops/districts` |
 | Verification | `GET/POST /verification` · `GET /verification/documents/:id` · `GET /verification/queue` · `POST /verification/queue/:userId` |
 | Farmer | `GET /farmer/summary` · `PATCH /farmer/farm` · `GET/POST /farmer/crops` · `PATCH/DELETE /farmer/crops/:id` · `GET /farmer/requests` · `POST /farmer/requests/:id/accept｜decline` · `GET /farmer/orders` · `GET /farmer/demand` |
@@ -387,7 +408,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by ten end-to-end suites — **425 assertions** — run against a live server and a real database:
+The API is covered by eleven end-to-end suites — **452 assertions** — run against a live server and a real database:
 
 ```bash
 cd server
@@ -408,6 +429,7 @@ npm test             # in another
 | `password` (22) | Reset codes, account enumeration, replay, guess limits, expiry, blocked accounts |
 | `push` (21) | Device registration, re-use by a new account, audience targeting, exclusions |
 | `limits` (24) | Account lockout and its expiry, flood protection, what a user object may contain |
+| `reviews` (27) | Ratings tied to completed orders, who may rate whom, averages, anonymity |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 
