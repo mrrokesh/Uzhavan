@@ -149,6 +149,8 @@ Nearby search uses a built-in table of Tamil Nadu's **38 districts** with centro
 
 That choice means **no GPS permission, no geocoding bill and no maps SDK** in the build. Free-text districts resolve through the aliases people actually type — "Attur, Salem", "Ooty", "Trichy", "Tuticorin".
 
+Buyers also get a **Picked for you** row, ranked from what they've actually done — farms they've bought from, categories they keep requesting, distance, verification, readiness. Every card carries the reason it was chosen, and the reason is whichever signal genuinely scored highest rather than a plausible-sounding one added afterwards. No machine learning: with a few hundred buyers there isn't the data for it, and a black box is a poor answer to "why am I seeing this?". Cold start degrades to "verified farms near you with crops ready now" rather than an empty screen.
+
 The demand board is deliberately **aggregate**: volume, average price and accept rate by category, plus a directory of active buyers. An individual request is a private negotiation between one buyer and one farm, and showing it to a competing farm would leak commercial information.
 
 ---
@@ -299,6 +301,7 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | --- | --- |
 | Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` |
 | Profile | `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
+| Suggestions | `GET /crops/suggested?limit=` |
 | Browse | `GET /crops` (`status` `q` `farmId` `following` `district` `radiusKm` `verifiedOnly` `category` `minPrice` `maxPrice` `sort`) · `GET /crops/:id` · `GET /crops/districts` |
 | Verification | `GET/POST /verification` · `GET /verification/documents/:id` · `GET /verification/queue` · `POST /verification/queue/:userId` |
 | Farmer | `GET /farmer/summary` · `PATCH /farmer/farm` · `GET/POST /farmer/crops` · `PATCH/DELETE /farmer/crops/:id` · `GET /farmer/requests` · `POST /farmer/requests/:id/accept｜decline` · `GET /farmer/orders` · `GET /farmer/demand` |
@@ -362,7 +365,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by six end-to-end suites — **336 assertions** — run against a live server and a real database:
+The API is covered by seven end-to-end suites — **358 assertions** — run against a live server and a real database:
 
 ```bash
 cd server
@@ -379,6 +382,7 @@ npm test             # in another
 | `phase` (45) | District distance, filters, demand board, announcements, payments, vehicle tracking |
 | `feat` (96) | Announcement audiences, demand privacy, driver verification, gateway switching, plate lookup |
 | `payout` (41) | Platform fee floor and ceiling, escrow scheduling, payout policy, overrides |
+| `suggest` (22) | Interest signals moving the ranking, exclusions, cold start, honest reasons |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 
@@ -415,7 +419,6 @@ If the database is shared with other applications, keep `connection_limit` in `D
 
 ## Not done yet
 
-- **Interest-based suggestions.** Nothing built, server or client.
 - **Uzhavan Plus in the app.** The subscription works server-side; there's no screen to buy it.
 - **A real Razorpay account.** No gateway is configured, so checkout, Route linked accounts and transfers have only ever been exercised against their refusal paths. The suites assert the scheduling and the clean 503 — not a completed payment.
 - **Deployment.** Nothing here is hosted.

@@ -639,3 +639,15 @@ export type PayoutLedger = {
   received: number;
   payouts: Payout[];
 };
+
+// ---- Suggestions -----------------------------------------------------------
+
+/** A crop the server picked for this buyer, with why it did. */
+export type SuggestedCrop = ApiCrop & { reason: string };
+
+export type Suggestions = {
+  /** False when there's no history yet and it's going on location alone. */
+  personalised: boolean;
+  count: number;
+  crops: SuggestedCrop[];
+};
