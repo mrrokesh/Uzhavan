@@ -4,6 +4,7 @@ import { Screen } from "../../components/Chrome";
 import { Logo } from "../../components/Logo";
 import { Chip, OutlineButton } from "../../components/ui";
 import { ProfileLinks } from "../../components/ProfileLinks";
+import { RatePrompt } from "../../components/RatePrompt";
 import { useFarmerOrders, useFarmerSummary } from "../../api/hooks";
 import { useAuth } from "../../context/AuthContext";
 import { imageFor } from "../../lib/images";
@@ -40,6 +41,12 @@ export function FarmerAccount() {
         </View>
 
         <ProfileLinks />
+
+        {/* Only the latest delivered sale. Every unrated order at once would
+            be a wall of forms, and the most recent is the one still fresh. */}
+        {sales.find((o) => o.status === "DELIVERED") ? (
+          <RatePrompt orderId={sales.find((o) => o.status === "DELIVERED")!.id} />
+        ) : null}
 
         <Text style={styles.section}>Sales</Text>
         {orders.isLoading ? <ActivityIndicator color={colors.forest} style={{ marginTop: 12 }} /> : null}

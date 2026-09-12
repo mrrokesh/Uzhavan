@@ -44,6 +44,13 @@ const WEIGHT = {
   nearbyRangeKm: 300,
   verified: 12,
   readyNow: 10,
+  /**
+   * Full marks at five stars, nothing at three. Only counted once a farm has
+   * enough reviews to mean something — one five-star review is not evidence,
+   * and letting it act like evidence rewards whoever asks a friend first.
+   */
+  ratedWell: 16,
+  ratingMinReviews: 3,
   /** A farm they follow, without having bought yet. */
   followedFarm: 15,
 } as const;
@@ -142,6 +149,8 @@ type Candidate = {
   reservedKg: number;
   farm: { name: string; district: string; districtKey: string | null };
   sellerVerified: boolean;
+  rating: number;
+  ratingCount: number;
 };
 
 /**
@@ -178,6 +187,16 @@ export function score(crop: Candidate, s: Signals): Suggestion | null {
       parts.push({
         points,
         reason: km <= 1 ? `In ${crop.farm.district}` : `About ${km} km away`,
+      });
+    }
+  }
+
+  if (crop.ratingCount >= WEIGHT.ratingMinReviews && crop.rating > 3) {
+    const points = Math.round(WEIGHT.ratedWell * ((crop.rating - 3) / 2));
+    if (points > 0) {
+      parts.push({
+        points,
+        reason: `Rated ${crop.rating.toFixed(1)} by ${crop.ratingCount} buyers`,
       });
     }
   }

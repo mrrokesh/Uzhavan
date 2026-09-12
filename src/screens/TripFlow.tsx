@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Share, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppHeader, Screen } from "../components/Chrome";
 import { MapView } from "../components/MapView";
 import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
+import { RatePrompt } from "../components/RatePrompt";
 import { RouteStops, Tracker } from "../components/Widgets";
 import {
   useBooking,
@@ -252,7 +253,25 @@ export function TrackTruck() {
 
         {!delivered && !cancelled && !waiting ? (
           <View style={styles.two}>
-            <OutlineButton label="Share tracking" icon="share-outline" />
+            <OutlineButton
+              label="Share details"
+              icon="share-outline"
+              onPress={() =>
+                // Text, not a link: there's no public tracking page to point at,
+                // and a warehouse gateman needs the plate and the code anyway.
+                void Share.share({
+                  message:
+                    `Uzhavan delivery ${booking.code}
+` +
+                    `${kg(booking.order?.quantityKg ?? 0)} ${booking.order?.product ?? "crop"}
+` +
+                    `${booking.pickup} → ${booking.destination}
+` +
+                    `Truck ${booking.truck?.plate ?? "—"}, driver ${booking.driver?.name ?? "—"}` +
+                    (booking.driver?.user?.phone ? ` (${booking.driver.user.phone})` : ""),
+                })
+              }
+            />
           </View>
         ) : null}
       </ScrollView>
@@ -287,10 +306,7 @@ export function DeliveryCompleted() {
   return (
     <Screen
       footer={
-        <>
-          <PrimaryButton label="Back to My Orders" onPress={() => navigation.navigate("Tabs")} />
-          <OutlineButton label="Rate driver" icon="star-outline" />
-        </>
+        <PrimaryButton label="Back to My Orders" onPress={() => navigation.navigate("Tabs")} />
       }
     >
       <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 16 }]}>
@@ -333,6 +349,14 @@ export function DeliveryCompleted() {
             <RouteStops pickup={booking.pickup} drop={booking.destination} />
           </View>
         </View>
+
+        {/* Asked here because this is the moment someone still remembers the
+            detail. A prompt a week later gets a shrug and a five. */}
+        {booking.orderId ? (
+          <View style={{ width: "100%" }}>
+            <RatePrompt orderId={booking.orderId} />
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );

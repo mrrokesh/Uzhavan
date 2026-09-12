@@ -30,6 +30,9 @@ import {
   type PaymentStart,
   type PayoutLedger,
   type Suggestions,
+  type Reviewable,
+  type Reputation,
+  type ReviewSubject,
 } from "./types";
 
 export const keys = {
@@ -499,6 +502,39 @@ export function useSuggestions(limit = 8) {
     queryKey: ["suggestions", limit],
     queryFn: () => api<Suggestions>(`/crops/suggested?limit=${limit}`),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ---- Reviews ---------------------------------------------------------------
+
+/** What this person may rate on this order, and what they already said. */
+export function useReviewable(orderId: string | undefined) {
+  return useQuery({
+    queryKey: ["reviewable", orderId ?? "none"],
+    enabled: !!orderId,
+    queryFn: () => api<Reviewable>(`/orders/${orderId}/reviews`),
+  });
+}
+
+export function useLeaveReview(orderId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { subject: ReviewSubject; stars: number; comment?: string }) =>
+      api(`/orders/${orderId}/reviews`, { method: "POST", body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reviewable", orderId ?? "none"] });
+      qc.invalidateQueries({ queryKey: ["reputation"] });
+      qc.invalidateQueries({ queryKey: ["crops"] });
+    },
+  });
+}
+
+/** Public reputation for a farm, driver or buyer. */
+export function useReputation(subject: ReviewSubject, subjectId: string | undefined) {
+  return useQuery({
+    queryKey: ["reputation", subject, subjectId ?? "none"],
+    enabled: !!subjectId,
+    queryFn: () => api<Reputation>(`/reviews/${subject}/${subjectId}`),
   });
 }
 

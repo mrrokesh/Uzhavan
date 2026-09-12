@@ -283,6 +283,10 @@ model User {
   saves    SavedCrop[]
 
   payments          Payment[]
+  reviewsWritten    Review[]           @relation("ReviewAuthor")
+  /// Average of the reviews farmers left about this buyer.
+  buyerRating       Float              @default(5)
+  buyerRatingCount  Int                @default(0)
   passwordResets    PasswordReset[]
   pushTokens        PushToken[]
   linkedAccount     LinkedAccount?
@@ -481,6 +485,46 @@ model Payment {
 /// A farmer's Razorpay Route account. Buyer money never sits in our own
 /// current account — RBI's payment-aggregator rules don't allow that — so the
 /// gateway holds it and we tell it when to let go.
+/// Who a review is about.
+enum ReviewSubject {
+  FARM
+  DRIVER
+  /// The farmer's view of a buyer: did they take the load and pay for it?
+  BUYER
+}
+
+/// One person's verdict on one completed order.
+///
+/// Tied to an order, always. An unattached review is a review anybody can
+/// write about anybody, which is how a ratings system becomes worthless — you
+/// can only rate a counterparty you actually traded with, once, after the crop
+/// arrived.
+model Review {
+  id      String @id @default(cuid())
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  author   User   @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+
+  subject   ReviewSubject
+  /// Farm id, Driver id or User id depending on `subject`.
+  subjectId String
+
+  /// 1 to 5. Enforced in the route, not the column — Prisma has no check
+  /// constraint, so the guarantee lives where it can produce a message.
+  stars   Int
+  comment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One verdict per order per counterparty. Rating someone twice for the same
+  /// trade would let one deal move an average as far as two.
+  @@unique([orderId, authorId, subject])
+  @@index([subject, subjectId])
+}
+
 /// Where to reach one installation of the app.
 ///
 /// A person can have several — a phone and a tablet, or the buyer app and the
@@ -637,7 +681,10 @@ model Farm {
   /// See src/data/districts.ts.
   districtKey String?
   location    String
+  /// Average of `ratingCount` reviews. 5 with no reviews is a placeholder, not
+  /// a claim — the app shows "new" rather than five stars until there are some.
   rating      Float    @default(5)
+  ratingCount Int      @default(0)
   avatarKey   String   @default("arul")
   crops       Crop[]
   createdAt   DateTime @default(now())
@@ -677,16 +724,17 @@ model Crop {
 }
 
 model Driver {
-  id       String  @id @default(cuid())
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId   String  @unique
-  name     String
-  rating   Float   @default(5)
-  trips    Int     @default(0)
-  photoKey String  @default("selvam")
-  verified Boolean @default(true)
+  id          String  @id @default(cuid())
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String  @unique
+  name        String
+  rating      Float   @default(5)
+  ratingCount Int     @default(0)
+  trips       Int     @default(0)
+  photoKey    String  @default("selvam")
+  verified    Boolean @default(true)
   /// Driver goes offline to stop receiving jobs.
-  online   Boolean @default(true)
+  online      Boolean @default(true)
 
   truck    Truck?
   bookings TruckBooking[]
@@ -793,6 +841,7 @@ model Order {
   paidAt       DateTime?
   createdAt    DateTime        @default(now())
   payouts      Payout[]
+  reviews      Review[]
 }
 
 model TruckBooking {
