@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { code, requireRole } from "../session.js";
+import { platformFeeBps, quote } from "../fees.js";
 import { asyncHandler, HttpError } from "../http.js";
 
 export const requestsRouter = Router();
@@ -10,6 +11,20 @@ const withRelations = {
   crop: { include: { farm: true } },
   order: true,
 } as const;
+
+type RequestRow = { quantityKg: number; finalPricePerKg: number | null; crop: { pricePerKg: number } };
+
+/**
+ * Attach what the buyer will actually pay. The fee isn't stored on a request —
+ * only on the order it becomes — so it's computed live here, and the buyer sees
+ * it before they commit rather than after.
+ */
+function withQuote<T extends RequestRow>(row: T, feeBps: number) {
+  const price = row.finalPricePerKg ?? row.crop.pricePerKg;
+  const goods = row.quantityKg * price;
+  const fee = Math.round((goods * feeBps) / 10000);
+  return { ...row, goodsValue: goods, feeBps, platformFee: fee, totalPayable: goods + fee };
+}
 
 requestsRouter.get(
   "/",
@@ -20,7 +35,8 @@ requestsRouter.get(
       include: withRelations,
       orderBy: { createdAt: "desc" },
     });
-    res.json(requests);
+    const feeBps = await platformFeeBps();
+    res.json(requests.map((r) => withQuote(r, feeBps)));
   }),
 );
 
@@ -33,7 +49,7 @@ requestsRouter.get(
       include: withRelations,
     });
     if (!request || request.buyerId !== buyer.id) throw new HttpError(404, "Request not found");
-    res.json(request);
+    res.json(withQuote(request, await platformFeeBps()));
   }),
 );
 
@@ -100,6 +116,11 @@ requestsRouter.post(
       throw new HttpError(400, `Only ${available} kg is still available on this listing`);
     }
 
+    // The farmer's number is untouched; the fee sits on top and the buyer pays
+    // it. Rate is stored on the order so a later change can't rewrite history.
+    const goods = request.quantityKg * price;
+    const { feeBps, fee, total } = await quote(goods);
+
     const order = await prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
         data: {
@@ -110,7 +131,10 @@ requestsRouter.post(
           product: request.crop.title,
           quantityKg: request.quantityKg,
           pricePerKg: price,
-          value: request.quantityKg * price,
+          value: goods,
+          feeBps,
+          platformFee: fee,
+          totalPayable: total,
           pickup: `${request.crop.farm.name}, ${request.crop.farm.location}`,
           destination: buyer.warehouse ?? buyer.market ?? "Buyer warehouse",
           harvestDate: request.crop.harvestDate,

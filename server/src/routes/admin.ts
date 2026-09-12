@@ -12,6 +12,7 @@ import {
   effectivePermissions,
   requirePermission,
 } from "../permissions.js";
+import { FEE_SETTING_KEY, MAX_FEE_PERCENT, MIN_FEE_PERCENT, percentToBps } from "../fees.js";
 import { currentUser, publicUser, requireAdmin, requireStaff } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 
@@ -222,9 +223,14 @@ const settingBody = z.object({ value: z.string().trim().min(1).max(200) });
 adminRouter.put(
   "/settings/:key",
   asyncHandler(async (req, res) => {
-    const actor = await requirePermission(req, "CONFIG_WRITE");
-    const { value } = settingBody.parse(req.body);
     const key = String(req.params.key);
+    // Support contacts are delegable — that's the point of CONFIG_WRITE. The
+    // platform's revenue rate is not: it's the same class of decision as
+    // switching which Razorpay account takes the money, so it stays with the
+    // admin and can't be granted away.
+    const actor =
+      key === FEE_SETTING_KEY ? await requireAdmin(req) : await requirePermission(req, "CONFIG_WRITE");
+    const { value } = settingBody.parse(req.body);
 
     const existing = await prisma.appSetting.findUnique({ where: { key } });
     if (!existing) throw new HttpError(404, "No such setting");
@@ -234,6 +240,14 @@ adminRouter.put(
     }
     if (key === "support_phone" && !/^[+0-9 ()-]{8,20}$/.test(value)) {
       throw new HttpError(400, "That isn't a valid phone number");
+    }
+    // The floor is a business rule, not a UI nicety — reject it here so it
+    // holds however the setting is written.
+    if (key === FEE_SETTING_KEY && percentToBps(value) === null) {
+      throw new HttpError(
+        400,
+        `The platform fee must be a number between ${MIN_FEE_PERCENT}% and ${MAX_FEE_PERCENT}%`,
+      );
     }
 
     const updated = await prisma.appSetting.update({

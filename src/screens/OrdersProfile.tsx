@@ -98,7 +98,7 @@ export function MyOrders() {
                   tone={delivered ? "mint" : booking ? "amber" : "neutral"}
                 />
               }
-              value={inr(o.value)}
+              value={inr(o.totalPayable || o.value)}
               onPress={() => {
                 if (delivered && booking) navigation.navigate("DeliveryCompleted", { bookingId: booking.id });
                 else if (booking) navigation.navigate("TrackTruck", { bookingId: booking.id });

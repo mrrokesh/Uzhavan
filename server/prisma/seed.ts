@@ -344,6 +344,14 @@ async function main() {
       description: "Displayed next to the contact details.",
       isPublic: true,
     },
+    {
+      key: "platform_fee_percent",
+      value: "5",
+      label: "Platform fee (%)",
+      description:
+        "Charged to buyers on top of the price the farmer agreed. Farmers and drivers pay nothing. Minimum 5%, maximum 30%.",
+      isPublic: false,
+    },
   ];
   for (const s of settings) {
     await prisma.appSetting.upsert({ where: { key: s.key }, create: s, update: { label: s.label, description: s.description, isPublic: s.isPublic } });
