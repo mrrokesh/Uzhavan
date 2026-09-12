@@ -6,6 +6,7 @@ import { prisma } from "../db.js";
 import { env } from "../env.js";
 import { currentUser, publicUser } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { resolveDistrict } from "../data/districts.js";
 
 export const authRouter = Router();
 
@@ -72,6 +73,7 @@ authRouter.post(
               avatarKey: "buyer",
               business: body.business,
               district: body.district,
+              districtKey: resolveDistrict(body.district)?.name ?? null,
               warehouse: body.warehouse?.trim() || `${body.district} Warehouse`,
               warehouseAddress: `${body.district}, Tamil Nadu`,
               market: body.market?.trim() || "Koyambedu Market, Chennai",
@@ -89,6 +91,7 @@ authRouter.post(
               phone: body.phone,
               avatarKey: "arul",
               district: body.district,
+              districtKey: resolveDistrict(body.district)?.name ?? null,
             },
           });
           await tx.farm.create({
@@ -97,6 +100,7 @@ authRouter.post(
               name: body.farmName,
               ownerName: body.name,
               district: body.district,
+              districtKey: resolveDistrict(body.district)?.name ?? null,
               location: `${body.location}, ${body.district}`,
               avatarKey: "arul",
             },

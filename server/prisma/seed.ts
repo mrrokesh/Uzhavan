@@ -1,5 +1,6 @@
 import { PrismaClient, type Permission } from "@prisma/client";
 import { hashPassword } from "../src/auth.js";
+import { resolveDistrict } from "../src/data/districts.js";
 
 const prisma = new PrismaClient();
 
@@ -195,14 +196,24 @@ async function main() {
         phone: f.phone,
         avatarKey: f.farm.avatarKey,
         district: f.farm.district,
+        districtKey: resolveDistrict(f.farm.district)?.name ?? null,
       },
       update: { passwordHash: pw },
     });
 
     const farm = await prisma.farm.upsert({
       where: { ownerId: user.id },
-      create: { ownerId: user.id, ownerName: f.name, ...f.farm },
-      update: { ...f.farm, ownerName: f.name },
+      create: {
+        ownerId: user.id,
+        ownerName: f.name,
+        ...f.farm,
+        districtKey: resolveDistrict(f.farm.district)?.name ?? null,
+      },
+      update: {
+        ...f.farm,
+        ownerName: f.name,
+        districtKey: resolveDistrict(f.farm.district)?.name ?? null,
+      },
     });
 
     for (const crop of f.crops) {
@@ -261,6 +272,7 @@ async function main() {
       avatarKey: "buyer",
       business: "Karthik Traders",
       district: "Salem",
+      districtKey: "Salem",
       warehouse: "Salem Agro Warehouse",
       warehouseAddress: "Salem, Tamil Nadu",
       market: "Koyambedu Market, Chennai",

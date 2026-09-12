@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { currentUser, publicUser, requireRole } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { resolveDistrict } from "../data/districts.js";
 
 export const meRouter = Router();
 
@@ -40,7 +41,12 @@ meRouter.patch(
       where: { id: user.id },
       data: {
         ...body,
-        ...(body.district ? { warehouseAddress: `${body.district}, Tamil Nadu` } : {}),
+        ...(body.district
+          ? {
+              warehouseAddress: `${body.district}, Tamil Nadu`,
+              districtKey: resolveDistrict(body.district)?.name ?? null,
+            }
+          : {}),
       },
     });
     res.json(publicUser(updated));
