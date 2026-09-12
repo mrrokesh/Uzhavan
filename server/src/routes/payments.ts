@@ -1,7 +1,9 @@
 import { Router, raw } from "express";
+import type { Order } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { audit } from "../audit.js";
+import { schedulePayouts } from "../payouts.js";
 import { currentUser } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 import {
@@ -33,8 +35,8 @@ paymentsRouter.get(
 );
 
 const startBody = z.object({
-  purpose: z.enum(["TRUCK_BOOKING", "PLUS_SUBSCRIPTION"]),
-  /** Booking id when paying for a trip. */
+  purpose: z.enum(["TRUCK_BOOKING", "PLUS_SUBSCRIPTION", "CROP_ORDER"]),
+  /** Booking id when paying for a trip, order id when paying for crops. */
   referenceId: z.string().optional(),
 });
 
@@ -47,8 +49,10 @@ paymentsRouter.post(
   asyncHandler(async (req, res) => {
     const user = await currentUser(req);
     const { purpose, referenceId } = startBody.parse(req.body);
-    const gateway = await activeGateway();
 
+    // Work out what's owed before touching the gateway. Asking Razorpay first
+    // meant a malformed request came back as "payments aren't set up", which
+    // sends the caller looking in entirely the wrong place.
     let amountPaise: number;
     if (purpose === "TRUCK_BOOKING") {
       if (!referenceId) throw new HttpError(400, "Which booking is this for?");
@@ -61,6 +65,14 @@ paymentsRouter.post(
       }
       if (booking.status !== "PENDING") throw new HttpError(409, "This booking is already paid");
       amountPaise = booking.total * 100;
+    } else if (purpose === "CROP_ORDER") {
+      if (!referenceId) throw new HttpError(400, "Which order is this for?");
+      const order = await prisma.order.findUnique({ where: { id: referenceId } });
+      if (!order || order.buyerId !== user.id) throw new HttpError(404, "Order not found");
+      if (order.paidAt) throw new HttpError(409, "This order is already paid");
+      // The buyer pays the whole thing — goods plus the platform fee. The split
+      // between us and the farmer happens on the way out, not on the way in.
+      amountPaise = order.totalPayable * 100;
     } else {
       if (user.plusUntil && user.plusUntil > new Date()) {
         throw new HttpError(409, "You already have Uzhavan Plus");
@@ -68,7 +80,10 @@ paymentsRouter.post(
       amountPaise = PLUS_PAISE;
     }
 
-    const receipt = `${purpose === "TRUCK_BOOKING" ? "trip" : "plus"}_${Date.now()}`;
+    const gateway = await activeGateway();
+    const receipt = `${
+      purpose === "TRUCK_BOOKING" ? "trip" : purpose === "CROP_ORDER" ? "order" : "plus"
+    }_${Date.now()}`;
     const order = await createOrder(gateway, amountPaise, receipt, {
       userId: user.id,
       purpose,
@@ -145,6 +160,8 @@ paymentsRouter.post(
  * client callback both land here and either may arrive first.
  */
 async function applyPayment(paymentId: string, razorpayPaymentId: string) {
+  let paidOrder: Order | null = null;
+
   await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({ where: { id: paymentId } });
     if (!payment || payment.status === "PAID") return;
@@ -179,7 +196,21 @@ async function applyPayment(paymentId: string, razorpayPaymentId: string) {
         });
       }
     }
+
+    if (payment.purpose === "CROP_ORDER" && payment.referenceId) {
+      const order = await tx.order.findUnique({ where: { id: payment.referenceId } });
+      if (order && !order.paidAt) {
+        paidOrder = await tx.order.update({
+          where: { id: order.id },
+          data: { paidAt: new Date() },
+        });
+      }
+    }
   });
+
+  // Outside the transaction on purpose: scheduling reads settings and must not
+  // hold a write lock while it does. It's idempotent, so a retry is harmless.
+  if (paidOrder) await schedulePayouts(paidOrder, paymentId);
 }
 
 /** My payment history. */

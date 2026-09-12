@@ -13,6 +13,16 @@ import {
   requirePermission,
 } from "../permissions.js";
 import { FEE_SETTING_KEY, MAX_FEE_PERCENT, MIN_FEE_PERCENT, percentToBps } from "../fees.js";
+import {
+  ADVANCE_KEY,
+  HOLD_KEY,
+  MAX_ADVANCE_PERCENT,
+  MAX_HOLD_HOURS,
+  POLICY_KEY,
+  isPolicy,
+  parseAdvancePercent,
+  parseHoldHours,
+} from "../payouts.js";
 import { currentUser, publicUser, requireAdmin, requireStaff } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 
@@ -224,12 +234,14 @@ adminRouter.put(
   "/settings/:key",
   asyncHandler(async (req, res) => {
     const key = String(req.params.key);
-    // Support contacts are delegable — that's the point of CONFIG_WRITE. The
-    // platform's revenue rate is not: it's the same class of decision as
-    // switching which Razorpay account takes the money, so it stays with the
-    // admin and can't be granted away.
-    const actor =
-      key === FEE_SETTING_KEY ? await requireAdmin(req) : await requirePermission(req, "CONFIG_WRITE");
+    // Support contacts are delegable — that's the point of CONFIG_WRITE. How
+    // much the platform takes and when farmers get paid are not: they're the
+    // same class of decision as switching which Razorpay account takes the
+    // money, so they stay with the admin and can't be granted away.
+    const MONEY_KEYS = [FEE_SETTING_KEY, POLICY_KEY, ADVANCE_KEY, HOLD_KEY];
+    const actor = MONEY_KEYS.includes(key)
+      ? await requireAdmin(req)
+      : await requirePermission(req, "CONFIG_WRITE");
     const { value } = settingBody.parse(req.body);
 
     const existing = await prisma.appSetting.findUnique({ where: { key } });
@@ -247,6 +259,21 @@ adminRouter.put(
       throw new HttpError(
         400,
         `The platform fee must be a number between ${MIN_FEE_PERCENT}% and ${MAX_FEE_PERCENT}%`,
+      );
+    }
+    if (key === POLICY_KEY && !isPolicy(value)) {
+      throw new HttpError(400, "Payout policy must be SPLIT_ON_LOAD or AFTER_DELIVERY");
+    }
+    if (key === ADVANCE_KEY && parseAdvancePercent(value) === null) {
+      throw new HttpError(
+        400,
+        `The advance must be a whole number between 0 and ${MAX_ADVANCE_PERCENT}%`,
+      );
+    }
+    if (key === HOLD_KEY && parseHoldHours(value) === null) {
+      throw new HttpError(
+        400,
+        `The hold must be a whole number of hours between 0 and ${MAX_HOLD_HOURS}`,
       );
     }
 
