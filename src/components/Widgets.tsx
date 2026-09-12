@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Crop } from "../data/seed";
+import type { Crop } from "../api/types";
 import { kg } from "../lib/format";
 import { colors, shadow } from "../theme";
 import { Chip } from "./ui";
@@ -168,7 +168,11 @@ const styles = StyleSheet.create({
   thumbWrap: { width: 92, height: 92 },
   thumb: { width: 92, height: 92, borderRadius: 14 },
   play: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#00000033",

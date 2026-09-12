@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -7,45 +7,70 @@ import { AppHeader, Screen } from "../components/Chrome";
 import { SuccessMark } from "../components/Logo";
 import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
 import { CropSummary, Stepper, Tracker } from "../components/Widgets";
-import { useApp } from "../context/AppContext";
-import { getCrop } from "../data/seed";
+import { useCrop, useCreateRequest, useRequest, useRequestAction } from "../api/hooks";
+import { REQUEST_LABEL } from "../api/types";
+import { imageFor } from "../lib/images";
+import { ApiError } from "../lib/api";
 import { inr, kg, pct } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
 
 export function SelectQuantity() {
   const { id } = useRoute<RouteProp<RootStackParamList, "SelectQuantity">>().params;
-  const crop = getCrop(id);
+  const crop = useCrop(id).data;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { quantity, setQuantity } = useApp();
-  const share = pct(quantity, crop.expectedKg);
-  const value = quantity * crop.pricePerKg;
+  const [quantity, setQuantity] = useState<number | null>(null);
+
+  if (!crop) {
+    return (
+      <Screen>
+        <AppHeader title="Select quantity" />
+        <ActivityIndicator color={colors.forest} style={{ marginTop: 48 }} />
+      </Screen>
+    );
+  }
+
+  const qty = quantity ?? Math.min(crop.minOrderKg, crop.availableKg);
+  const share = pct(qty, crop.availableKg);
+  const value = qty * crop.pricePerKg;
+  const presets = [crop.minOrderKg, crop.minOrderKg * 2, crop.minOrderKg * 4].filter(
+    (p) => p <= crop.availableKg,
+  );
 
   return (
-    <Screen footer={<PrimaryButton label="Review request" onPress={() => navigation.navigate("ReviewRequest", { id: crop.id })} />}>
+    <Screen
+      footer={
+        <PrimaryButton
+          label="Review request"
+          onPress={() => navigation.navigate("ReviewRequest", { id: crop.id, quantityKg: qty })}
+        />
+      }
+    >
       <AppHeader title="Select quantity" />
       <ScrollView contentContainerStyle={styles.pad}>
         <CropSummary crop={crop} />
         <View style={styles.avail}>
-          <Text style={styles.muted}>📦 {kg(crop.expectedKg)} expected</Text>
+          <Text style={styles.muted}>📦 {kg(crop.availableKg)} available</Text>
           <Text style={styles.muted}>Minimum order {kg(crop.minOrderKg)}</Text>
         </View>
+
         <View style={{ marginTop: 24 }}>
           <Stepper
-            value={quantity}
-            onDec={() => setQuantity(Math.max(crop.minOrderKg, quantity - 100))}
-            onInc={() => setQuantity(Math.min(crop.expectedKg, quantity + 100))}
+            value={qty}
+            onDec={() => setQuantity(Math.max(crop.minOrderKg, qty - 100))}
+            onInc={() => setQuantity(Math.min(crop.availableKg, qty + 100))}
           />
           <View style={styles.picks}>
-            {[500, 1000, 2000].map((p) => (
-              <Chip key={p} label={kg(p)} active={quantity === p} onPress={() => setQuantity(p)} />
+            {presets.map((p) => (
+              <Chip key={p} label={kg(p)} active={qty === p} onPress={() => setQuantity(p)} />
             ))}
           </View>
           <View style={styles.barBg}>
             <View style={[styles.bar, { width: `${share}%` }]} />
           </View>
-          <Text style={styles.centerMuted}>{share}% of available quantity</Text>
+          <Text style={styles.centerMuted}>{share}% of what’s still available</Text>
         </View>
+
         <View style={styles.valueCard}>
           <Text style={styles.muted}>Estimated value</Text>
           <Text style={styles.bigMoney}>{inr(value)}</Text>
@@ -58,31 +83,51 @@ export function SelectQuantity() {
 }
 
 export function ReviewRequest() {
-  const { id } = useRoute<RouteProp<RootStackParamList, "ReviewRequest">>().params;
-  const crop = getCrop(id);
+  const { id, quantityKg } = useRoute<RouteProp<RootStackParamList, "ReviewRequest">>().params;
+  const crop = useCrop(id).data;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { quantity, setRequestSent } = useApp();
-  const value = quantity * crop.pricePerKg;
+  const create = useCreateRequest();
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  if (!crop) {
+    return (
+      <Screen>
+        <AppHeader title="Review request" />
+        <ActivityIndicator color={colors.forest} style={{ marginTop: 48 }} />
+      </Screen>
+    );
+  }
+
+  const send = async () => {
+    setSending(true);
+    setError(null);
+    try {
+      const request = await create.mutateAsync({ cropId: crop.id, quantityKg });
+      navigation.replace("RequestSent", { requestId: request.id });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn’t send your request.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Screen
       footer={
-        <PrimaryButton
-          label="Send request to farmer"
-          onPress={() => {
-            setRequestSent(true);
-            navigation.navigate("RequestSent");
-          }}
-        />
+        <>
+          <PrimaryButton label="Send request to farmer" onPress={send} loading={sending} disabled={sending} />
+          {error ? <Text style={styles.danger}>{error}</Text> : null}
+        </>
       }
     >
       <AppHeader title="Review request" />
       <ScrollView contentContainerStyle={styles.pad}>
         <CropSummary crop={crop} />
         <View style={styles.list}>
-          <Row label="Requested quantity" value={kg(quantity)} strong />
+          <Row label="Requested quantity" value={kg(quantityKg)} strong />
           <Divider />
-          <Row label="Estimated value" value={inr(value)} strong />
+          <Row label="Estimated value" value={inr(quantityKg * crop.pricePerKg)} strong />
           <Divider />
           <Row label="Expected harvest" value={crop.harvestDate} />
           <Divider />
@@ -96,15 +141,15 @@ export function ReviewRequest() {
 }
 
 export function RequestSent() {
+  const { requestId } = useRoute<RouteProp<RootStackParamList, "RequestSent">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { quantity, requestId } = useApp();
-  const crop = getCrop("bhagwa");
+  const request = useRequest(requestId).data;
 
   return (
     <Screen
       footer={
         <>
-          <PrimaryButton label="Track request" onPress={() => navigation.navigate("RequestDetails")} />
+          <PrimaryButton label="Track request" onPress={() => navigation.replace("RequestDetails", { requestId })} />
           <Pressable onPress={() => navigation.navigate("Tabs")}>
             <Text style={styles.textLink}>Back to Home</Text>
           </Pressable>
@@ -115,26 +160,28 @@ export function RequestSent() {
         <SuccessMark />
         <Text style={styles.h1}>Request sent!</Text>
         <Text style={styles.sub}>
-          Your request for {kg(quantity)} has been sent to {crop.farmName}.
+          Your request for {kg(request?.quantityKg ?? 0)} has been sent to {request?.crop?.farm.name}.
         </Text>
         <View style={{ marginTop: 16 }}>
           <Chip label="🕒 Awaiting farmer confirmation" tone="amber" />
         </View>
         <View style={[styles.list, { width: "100%", marginTop: 20 }]}>
-          <Row label="Request ID" value={requestId} strong />
+          <Row label="Request ID" value={request?.code ?? "—"} strong />
           <Divider />
-          <Row label="Product" value={crop.title} />
+          <Row label="Product" value={request?.crop?.title ?? "—"} />
           <Divider />
-          <Row label="Requested quantity" value={kg(quantity)} />
+          <Row label="Requested quantity" value={kg(request?.quantityKg ?? 0)} />
           <Divider />
-          <Row label="Estimated value" value={inr(quantity * crop.pricePerKg)} />
+          <Row label="Estimated value" value={inr(request?.estimatedValue ?? 0)} />
           <Divider />
-          <Row label="Expected harvest" value={crop.harvestDate} />
+          <Row label="Expected harvest" value={request?.crop?.harvestDate ?? "—"} />
         </View>
         <View style={{ width: "100%", marginTop: 16 }}>
           <InfoNote>
             <Ionicons name="time-outline" size={16} color={colors.forest} />
-            <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>{crop.farmName} usually responds within 6 hours.</Text>
+            <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>
+              {request?.crop?.farm.name} will review the quantity and set a final price. You’ll see it here.
+            </Text>
           </InfoNote>
         </View>
       </ScrollView>
@@ -142,70 +189,173 @@ export function RequestSent() {
   );
 }
 
+/**
+ * The buyer's live view of one request. It polls, so the moment the real farmer
+ * accepts or declines in their own app, this screen changes.
+ */
 export function RequestDetails() {
+  const { requestId } = useRoute<RouteProp<RootStackParamList, "RequestDetails">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { quantity, setFarmerAccepted, farmerAccepted } = useApp();
-  const crop = getCrop("bhagwa");
-  const [cancel, setCancel] = useState(false);
+  const query = useRequest(requestId, true);
+  const action = useRequestAction();
+  const [working, setWorking] = useState(false);
+
+  const request = query.data;
+
+  if (!request) {
+    return (
+      <Screen>
+        <AppHeader title="Request details" />
+        <ActivityIndicator color={colors.forest} style={{ marginTop: 48 }} />
+      </Screen>
+    );
+  }
+
+  const crop = request.crop;
+  const accepted = request.status === "FARMER_ACCEPTED";
+  const pending = request.status === "PENDING";
+  const closed = ["FARMER_DECLINED", "BUYER_DECLINED", "CANCELLED"].includes(request.status);
+  const finalPrice = request.finalPricePerKg ?? crop?.pricePerKg ?? 0;
+
+  const cancel = async () => {
+    setWorking(true);
+    try {
+      await action.mutateAsync({ id: request.id, action: "cancel" });
+    } finally {
+      setWorking(false);
+    }
+  };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        accepted ? (
+          <PrimaryButton
+            label="Review & confirm"
+            onPress={() => navigation.navigate("ConfirmPurchase", { requestId: request.id })}
+          />
+        ) : request.status === "CONFIRMED" && request.order ? (
+          <PrimaryButton
+            label="Book a truck"
+            onPress={() => navigation.navigate("BookTruckOrder", { orderId: request.order!.id })}
+          />
+        ) : undefined
+      }
+    >
       <AppHeader title="Request details" />
       <ScrollView contentContainerStyle={styles.pad}>
-        <InfoNote tone="amber">
-          <Ionicons name="time-outline" size={16} color={colors.amberText} />
-          <Text style={{ flex: 1, color: colors.amberText, fontSize: 12.5 }}>
-            Awaiting farmer confirmation — the farmer is reviewing your requested quantity and final price.
-          </Text>
-        </InfoNote>
+        {pending ? (
+          <InfoNote tone="amber">
+            <Ionicons name="time-outline" size={16} color={colors.amberText} />
+            <Text style={{ flex: 1, color: colors.amberText, fontSize: 12.5 }}>
+              Awaiting farmer confirmation — {crop?.farm.name} is reviewing your quantity and final price.
+            </Text>
+          </InfoNote>
+        ) : null}
+
+        {accepted ? (
+          <View style={styles.accept}>
+            <View style={styles.check}>
+              <Ionicons name="checkmark" size={16} color={colors.forest} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.acceptTitle}>Farmer accepted your request</Text>
+              <Text style={styles.acceptSub}>
+                {crop?.farm.name} accepted {kg(request.quantityKg)} at {inr(finalPrice)}/kg.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {request.status === "FARMER_DECLINED" ? (
+          <InfoNote tone="amber">
+            <Ionicons name="close-circle-outline" size={16} color={colors.amberText} />
+            <Text style={{ flex: 1, color: colors.amberText, fontSize: 12.5 }}>
+              {crop?.farm.name} declined this request
+              {request.declineReason ? ` — ${request.declineReason}` : "."}
+            </Text>
+          </InfoNote>
+        ) : null}
+
+        {closed && request.status !== "FARMER_DECLINED" ? (
+          <View style={{ flexDirection: "row" }}>
+            <Chip label={REQUEST_LABEL[request.status]} />
+          </View>
+        ) : null}
+
         <View style={{ marginTop: 20 }}>
           <Tracker
             steps={[
-              { title: "Request sent", meta: "10:42 AM", state: "done" },
-              { title: "Farmer reviewing", meta: "In progress", state: "current" },
-              { title: "Quantity reserved", meta: "Pending", state: "pending" },
-              { title: "Payment pending", meta: "Pending", state: "pending" },
+              { title: "Request sent", meta: request.code, state: "done" },
+              {
+                title: "Farmer reviewing",
+                meta: pending ? "In progress" : closed ? "Closed" : "Responded",
+                state: pending ? "current" : closed ? "pending" : "done",
+              },
+              {
+                title: "Quantity reserved",
+                meta: request.status === "CONFIRMED" ? "Reserved" : "Pending",
+                state: request.status === "CONFIRMED" ? "done" : accepted ? "current" : "pending",
+              },
+              {
+                title: "Transport",
+                meta: request.order ? "Choose a truck" : "Pending",
+                state: request.order ? "current" : "pending",
+              },
             ]}
           />
         </View>
+
         <View style={styles.mini}>
-          <Image source={crop.image} style={styles.miniImg} />
+          <Image source={imageFor(crop?.imageKey)} style={styles.miniImg} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.farm}>{crop.title}</Text>
-            <Text style={styles.muted}>{kg(quantity)}</Text>
+            <Text style={styles.farm}>{crop?.title}</Text>
+            <Text style={styles.muted}>{kg(request.quantityKg)}</Text>
           </View>
           <View>
-            <Text style={styles.muted}>Estimated</Text>
-            <Text style={styles.green}>{inr(quantity * crop.pricePerKg)}</Text>
+            <Text style={styles.muted}>{accepted || request.status === "CONFIRMED" ? "Final" : "Estimated"}</Text>
+            <Text style={styles.green}>{inr(finalPrice * request.quantityKg)}</Text>
           </View>
         </View>
+
         <View style={styles.mini}>
-          <Image source={crop.avatar} style={styles.av} />
+          <Image source={imageFor(crop?.farm.avatarKey)} style={styles.av} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.farm}>{crop.farmName} ✓</Text>
-            <Text style={styles.muted}>{crop.district}</Text>
+            <Text style={styles.farm}>{crop?.farm.name} ✓</Text>
+            <Text style={styles.muted}>{crop?.farm.district}</Text>
           </View>
-          <Text style={styles.link}>View farmer ›</Text>
+          {crop ? (
+            <Pressable
+              onPress={() => navigation.navigate("FarmerProfile", { farmId: crop.farmId, cropId: crop.id })}
+            >
+              <Text style={styles.link}>View farmer ›</Text>
+            </Pressable>
+          ) : null}
         </View>
-        <InfoNote>
-          <Ionicons name="leaf-outline" size={16} color={colors.forest} />
-          <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>We’ll notify you when the farmer confirms the quantity and final price.</Text>
-        </InfoNote>
-        {!farmerAccepted ? (
-          <Pressable
-            onPress={() => {
-              setFarmerAccepted(true);
-              navigation.navigate("RequestUpdate");
-            }}
-          >
-            <Text style={styles.skip}>Farmer responded — view update</Text>
-          </Pressable>
+
+        {pending ? (
+          <>
+            <InfoNote>
+              <Ionicons name="leaf-outline" size={16} color={colors.forest} />
+              <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>
+                This updates automatically when the farmer responds.
+              </Text>
+            </InfoNote>
+            <View style={styles.two}>
+              <OutlineButton
+                label="Edit request"
+                icon="pencil-outline"
+                onPress={() => crop && navigation.navigate("SelectQuantity", { id: crop.id })}
+              />
+              <OutlineButton
+                label={working ? "Cancelling…" : "Cancel request"}
+                icon="trash-outline"
+                tone="danger"
+                onPress={cancel}
+              />
+            </View>
+          </>
         ) : null}
-        <View style={styles.two}>
-          <OutlineButton label="Edit request" icon="pencil-outline" onPress={() => navigation.navigate("SelectQuantity", { id: crop.id })} />
-          <OutlineButton label="Cancel request" icon="trash-outline" tone="danger" onPress={() => setCancel(true)} />
-        </View>
-        {cancel ? <Text style={styles.danger}>Request cancelled. The farmer will be notified.</Text> : null}
       </ScrollView>
     </Screen>
   );
@@ -247,7 +397,10 @@ const styles = StyleSheet.create({
   av: { width: 44, height: 44, borderRadius: 22 },
   green: { fontSize: 14, fontWeight: "700", color: colors.forest },
   link: { fontSize: 12, fontWeight: "600", color: colors.forest },
-  skip: { marginTop: 12, textAlign: "center", fontSize: 12, color: colors.muted, textDecorationLine: "underline" },
   two: { marginTop: 16, flexDirection: "row", gap: 8 },
   danger: { marginTop: 8, textAlign: "center", fontSize: 12, color: colors.danger },
+  accept: { flexDirection: "row", gap: 12, backgroundColor: colors.mint, borderRadius: 16, padding: 14 },
+  check: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+  acceptTitle: { fontSize: 15, fontWeight: "600", color: colors.forest },
+  acceptSub: { marginTop: 2, fontSize: 12.5, color: "#1B5E3BCC" },
 });
