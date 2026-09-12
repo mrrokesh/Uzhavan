@@ -502,6 +502,26 @@ export function useSuggestions(limit = 8) {
   });
 }
 
+// ---- Password reset --------------------------------------------------------
+
+/** Always resolves the same way, whether or not the account exists. */
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (email: string) =>
+      api<{ sent: boolean; message: string }>("/auth/password/forgot", {
+        method: "POST",
+        body: { email },
+      }),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (body: { email: string; code: string; password: string }) =>
+      api<{ reset: boolean }>("/auth/password/reset", { method: "POST", body }),
+  });
+}
+
 // ---- Payments and payouts --------------------------------------------------
 
 export function usePaymentConfig() {

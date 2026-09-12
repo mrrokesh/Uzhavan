@@ -51,9 +51,39 @@ export const env = {
   supportEmail: process.env.SUPPORT_EMAIL ?? "support@uzhavan.app",
   supportPhone: process.env.SUPPORT_PHONE ?? "",
   ticketEscalationHours: int("TICKET_ESCALATION_HOURS", 24),
+
+  /**
+   * Delivery. Both default to "log", which prints the message instead of
+   * sending it — so the whole flow works on a laptop with no accounts, and a
+   * missing credential can never silently become a message nobody receives.
+   */
+  emailDriver: (process.env.EMAIL_DRIVER ?? "log") as "log" | "smtp",
+  smtpUrl: process.env.SMTP_URL ?? "",
+  emailFrom: process.env.EMAIL_FROM ?? "Uzhavan <no-reply@uzhavan.app>",
+
+  smsDriver: (process.env.SMS_DRIVER ?? "log") as "log" | "msg91",
+  msg91Key: process.env.MSG91_AUTH_KEY ?? "",
+  msg91SenderId: process.env.MSG91_SENDER_ID ?? "UZHAVN",
+
+  /** Minutes a password-reset code stays valid. Short on purpose. */
+  resetCodeMinutes: int("RESET_CODE_MINUTES", 15),
 };
 
 // A wide-open CORS policy is fine in dev and dangerous in production.
 if (env.isProduction && env.corsOrigin === "*") {
   throw new Error("CORS_ORIGIN must be set to explicit origins in production");
+}
+
+// Fail at boot rather than at the moment someone is locked out of their
+// account and the reset code goes to a log file nobody reads.
+if (env.emailDriver === "smtp" && !env.smtpUrl) {
+  throw new Error("EMAIL_DRIVER=smtp needs SMTP_URL");
+}
+if (env.smsDriver === "msg91" && !env.msg91Key) {
+  throw new Error("SMS_DRIVER=msg91 needs MSG91_AUTH_KEY");
+}
+if (env.isProduction && env.emailDriver === "log" && env.smsDriver === "log") {
+  throw new Error(
+    "Set EMAIL_DRIVER or SMS_DRIVER in production — with both on 'log', password resets go nowhere",
+  );
 }

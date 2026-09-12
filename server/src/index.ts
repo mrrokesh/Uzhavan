@@ -8,6 +8,7 @@ import { startTicketSweeper } from "./tickets/assignment.js";
 import { startPayoutSweeper } from "./payouts.js";
 import { payoutsRouter, adminPayoutsRouter } from "./routes/payouts.js";
 import { authRouter } from "./routes/auth.js";
+import { passwordRouter } from "./routes/password.js";
 import { meRouter } from "./routes/me.js";
 import { verificationRouter } from "./routes/verification.js";
 import { moderationRouter } from "./routes/moderation.js";
@@ -53,6 +54,7 @@ app.get("/api/health", async (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/auth/password", passwordRouter);
 app.use("/api/me", meRouter);
 app.use("/api/verification", verificationRouter);
 app.use("/api/app", appRouter);

@@ -29,6 +29,7 @@ const SUITES = [
   ["feat", "Announcements, demand, driver verification, gateways, tracking"],
   ["payout", "Platform fee, escrow scheduling, payout policy and overrides"],
   ["suggest", "Interest signals, ranking, exclusions, cold start"],
+  ["password", "Reset codes, enumeration, replay, guess limits, expiry"],
 ];
 
 const run = (name) =>
