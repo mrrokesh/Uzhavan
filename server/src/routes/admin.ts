@@ -12,6 +12,17 @@ import {
   effectivePermissions,
   requirePermission,
 } from "../permissions.js";
+import { FEE_SETTING_KEY, MAX_FEE_PERCENT, MIN_FEE_PERCENT, percentToBps } from "../fees.js";
+import {
+  ADVANCE_KEY,
+  HOLD_KEY,
+  MAX_ADVANCE_PERCENT,
+  MAX_HOLD_HOURS,
+  POLICY_KEY,
+  isPolicy,
+  parseAdvancePercent,
+  parseHoldHours,
+} from "../payouts.js";
 import { currentUser, publicUser, requireAdmin, requireStaff } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 
@@ -222,9 +233,16 @@ const settingBody = z.object({ value: z.string().trim().min(1).max(200) });
 adminRouter.put(
   "/settings/:key",
   asyncHandler(async (req, res) => {
-    const actor = await requirePermission(req, "CONFIG_WRITE");
-    const { value } = settingBody.parse(req.body);
     const key = String(req.params.key);
+    // Support contacts are delegable — that's the point of CONFIG_WRITE. How
+    // much the platform takes and when farmers get paid are not: they're the
+    // same class of decision as switching which Razorpay account takes the
+    // money, so they stay with the admin and can't be granted away.
+    const MONEY_KEYS = [FEE_SETTING_KEY, POLICY_KEY, ADVANCE_KEY, HOLD_KEY];
+    const actor = MONEY_KEYS.includes(key)
+      ? await requireAdmin(req)
+      : await requirePermission(req, "CONFIG_WRITE");
+    const { value } = settingBody.parse(req.body);
 
     const existing = await prisma.appSetting.findUnique({ where: { key } });
     if (!existing) throw new HttpError(404, "No such setting");
@@ -234,6 +252,29 @@ adminRouter.put(
     }
     if (key === "support_phone" && !/^[+0-9 ()-]{8,20}$/.test(value)) {
       throw new HttpError(400, "That isn't a valid phone number");
+    }
+    // The floor is a business rule, not a UI nicety — reject it here so it
+    // holds however the setting is written.
+    if (key === FEE_SETTING_KEY && percentToBps(value) === null) {
+      throw new HttpError(
+        400,
+        `The platform fee must be a number between ${MIN_FEE_PERCENT}% and ${MAX_FEE_PERCENT}%`,
+      );
+    }
+    if (key === POLICY_KEY && !isPolicy(value)) {
+      throw new HttpError(400, "Payout policy must be SPLIT_ON_LOAD or AFTER_DELIVERY");
+    }
+    if (key === ADVANCE_KEY && parseAdvancePercent(value) === null) {
+      throw new HttpError(
+        400,
+        `The advance must be a whole number between 0 and ${MAX_ADVANCE_PERCENT}%`,
+      );
+    }
+    if (key === HOLD_KEY && parseHoldHours(value) === null) {
+      throw new HttpError(
+        400,
+        `The hold must be a whole number of hours between 0 and ${MAX_HOLD_HOURS}`,
+      );
     }
 
     const updated = await prisma.appSetting.update({

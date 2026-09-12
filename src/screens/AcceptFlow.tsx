@@ -37,7 +37,10 @@ export function ConfirmPurchase() {
 
   const crop = request.crop;
   const price = request.finalPricePerKg ?? crop?.pricePerKg ?? 0;
-  const value = price * request.quantityKg;
+  const value = request.goodsValue ?? price * request.quantityKg;
+  const fee = request.platformFee ?? 0;
+  const feePercent = (request.feeBps ?? 0) / 100;
+  const total = request.totalPayable ?? value + fee;
 
   const submit = async () => {
     setWorking(true);
@@ -95,7 +98,11 @@ export function ConfirmPurchase() {
           <Divider />
           <Row label="Final price" value={`${inr(price)}/kg`} strong />
           <Divider />
-          <Row label="Order value" value={inr(value)} green />
+          <Row label="Goes to the farmer" value={inr(value)} />
+          <Divider />
+          <Row label={`Platform fee (${feePercent}%)`} value={inr(fee)} />
+          <Divider />
+          <Row label="You pay" value={inr(total)} green strong />
           <Divider />
           <Row label="Expected harvest / pickup" value={crop?.harvestDate ?? "—"} />
           <Divider />
@@ -134,15 +141,20 @@ export function QuantityConfirmed() {
     setWorking(true);
     try {
       await setTransport.mutateAsync({ id: orderId, transport });
-      if (transport === "BOOK") navigation.replace("BookTruckOrder", { orderId });
-      else navigation.navigate("Tabs");
+      // Payment first. Nothing is reserved with the farmer, and no truck is
+      // worth booking, until the money is actually in escrow.
+      navigation.replace("Checkout", { orderId });
     } finally {
       setWorking(false);
     }
   };
 
   return (
-    <Screen footer={<PrimaryButton label="Continue" onPress={go} loading={working} disabled={working} />}>
+    <Screen
+      footer={
+        <PrimaryButton label="Continue to payment" onPress={go} loading={working} disabled={working} />
+      }
+    >
       <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 24 }]}>
         <SuccessMark />
         <Text style={styles.h1}>Quantity confirmed!</Text>
@@ -153,7 +165,14 @@ export function QuantityConfirmed() {
         <View style={[styles.list, { width: "100%" }]}>
           <Row label="Order ID" value={order?.code ?? "—"} strong />
           <Divider />
-          <Row label="Order value" value={inr(order?.value ?? 0)} green />
+          <Row label="Goes to the farmer" value={inr(order?.value ?? 0)} />
+          <Divider />
+          <Row
+            label={`Platform fee (${(order?.feeBps ?? 0) / 100}%)`}
+            value={inr(order?.platformFee ?? 0)}
+          />
+          <Divider />
+          <Row label="You pay" value={inr(order?.totalPayable ?? order?.value ?? 0)} green strong />
           <Divider />
           <Row label="Pickup from" value={order?.harvestDate ?? "—"} />
           <Divider />
@@ -231,7 +250,7 @@ export function BookTruckOrder() {
           <Divider />
           <Row label="Pickup date" value={order.harvestDate} />
           <Divider />
-          <Row label="Order value" value={inr(order.value)} />
+          <Row label="Order total" value={inr(order.totalPayable || order.value)} />
         </View>
 
         <View style={styles.suggest}>

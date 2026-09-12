@@ -116,3 +116,106 @@ export function verifyWebhookSignature(
 export function modeForKey(keyId: string): "TEST" | "LIVE" {
   return keyId.startsWith("rzp_live_") ? "LIVE" : "TEST";
 }
+
+// ---- Route -----------------------------------------------------------------
+//
+// Route is how a marketplace pays its sellers without the money ever passing
+// through its own current account. Each farmer is a "linked account"; a payment
+// is split into "transfers"; a transfer created `on_hold` sits at Razorpay
+// until we release it. That hold is our escrow — we never custody the funds.
+
+async function route<T>(
+  gateway: ActiveGateway,
+  path: string,
+  init: { method: "GET" | "POST" | "PATCH"; body?: unknown },
+): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: init.method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader(gateway.keyId, gateway.keySecret),
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+
+  const body = (await res.json().catch(() => ({}))) as T & {
+    error?: { description?: string; reason?: string };
+  };
+  if (!res.ok) {
+    throw new HttpError(
+      502,
+      body?.error?.description ? `Razorpay: ${body.error.description}` : `Razorpay refused the request (${res.status})`,
+    );
+  }
+  return body;
+}
+
+export type RouteAccount = { id: string; status?: string };
+
+/**
+ * Register a farmer as a payee. Razorpay needs a real bank account and a legal
+ * name; the name must match the account or settlements bounce.
+ */
+export async function createLinkedAccount(
+  gateway: ActiveGateway,
+  input: {
+    email: string;
+    phone: string;
+    legalName: string;
+    accountNumber: string;
+    ifsc: string;
+    beneficiaryName: string;
+  },
+): Promise<RouteAccount> {
+  return route<RouteAccount>(gateway, "/accounts", {
+    method: "POST",
+    body: {
+      email: input.email,
+      phone: input.phone.replace(/[^0-9]/g, "").slice(-10),
+      type: "route",
+      legal_business_name: input.legalName,
+      business_type: "individual",
+      contact_name: input.beneficiaryName,
+      profile: { category: "food", subcategory: "agriculture" },
+      settlements: {
+        account_number: input.accountNumber,
+        ifsc_code: input.ifsc.toUpperCase(),
+        beneficiary_name: input.beneficiaryName,
+      },
+      tnc_accepted: true,
+    },
+  });
+}
+
+export type RouteTransfer = { id: string; status?: string; on_hold?: boolean };
+
+/**
+ * Move money to a farmer. Created released, because our hold lives in the
+ * Payout table — a transfer only ever gets created once we've decided it's due,
+ * which keeps one source of truth for "is this owed yet".
+ */
+export async function createTransfer(
+  gateway: ActiveGateway,
+  input: { accountId: string; amountPaise: number; notes?: Record<string, string> },
+): Promise<RouteTransfer> {
+  return route<RouteTransfer>(gateway, "/transfers", {
+    method: "POST",
+    body: {
+      account: input.accountId,
+      amount: input.amountPaise,
+      currency: "INR",
+      ...(input.notes ? { notes: input.notes } : {}),
+    },
+  });
+}
+
+/** Let go of a transfer that was parked at the gateway. */
+export async function releaseHeldTransfer(
+  gateway: ActiveGateway,
+  transferId: string,
+): Promise<RouteTransfer> {
+  return route<RouteTransfer>(gateway, `/transfers/${transferId}`, {
+    method: "PATCH",
+    body: { on_hold: false },
+  });
+}

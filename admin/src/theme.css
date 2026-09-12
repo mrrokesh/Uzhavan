@@ -233,3 +233,14 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); 
 .doc img { width: 100%; height: 112px; object-fit: cover; display: block; background: var(--cream); }
 .doc .cap { padding: 7px 9px; font-size: 11.5px; }
 .doc .cap b { display: block; font-weight: 600; }
+
+/* ── Detail pairs (vehicle tracking) ─────────────────── */
+
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+
+.pairs { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 8px 0 0; }
+.pairs dt { font-size: 12.5px; color: var(--muted); }
+.pairs dd { font-size: 13.5px; margin: 0; color: var(--ink); }
+.pairs dd code { font-size: 12.5px; }
+
+.danger-text { color: var(--danger); font-weight: 600; }

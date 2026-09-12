@@ -79,6 +79,9 @@ export function MyOrders() {
         {orders.map((o) => {
           const booking = o.booking && o.booking.status !== "CANCELLED" ? o.booking : null;
           const delivered = o.status === "DELIVERED";
+          // Unpaid comes first: nothing else about the order matters until the
+          // buyer has paid, and the farmer isn't owed anything either.
+          const unpaid = !o.paidAt;
           return (
             <OrderCard
               key={o.id}
@@ -89,18 +92,21 @@ export function MyOrders() {
               chip={
                 <Chip
                   label={
-                    booking
-                      ? BOOKING_LABEL[booking.status]
-                      : o.transport === "PRIVATE"
-                        ? "Private truck"
-                        : "Awaiting truck"
+                    unpaid
+                      ? "Payment due"
+                      : booking
+                        ? BOOKING_LABEL[booking.status]
+                        : o.transport === "PRIVATE"
+                          ? "Private truck"
+                          : "Awaiting truck"
                   }
-                  tone={delivered ? "mint" : booking ? "amber" : "neutral"}
+                  tone={unpaid ? "amber" : delivered ? "mint" : booking ? "amber" : "neutral"}
                 />
               }
-              value={inr(o.value)}
+              value={inr(o.totalPayable || o.value)}
               onPress={() => {
-                if (delivered && booking) navigation.navigate("DeliveryCompleted", { bookingId: booking.id });
+                if (unpaid) navigation.navigate("Checkout", { orderId: o.id });
+                else if (delivered && booking) navigation.navigate("DeliveryCompleted", { bookingId: booking.id });
                 else if (booking) navigation.navigate("TrackTruck", { bookingId: booking.id });
                 else navigation.navigate("BookTruckOrder", { orderId: o.id });
               }}

@@ -9,10 +9,75 @@ import {
   districtsWithin,
   resolveDistrict,
 } from "../data/districts.js";
+import { rank, readSignals } from "../suggestions.js";
 
 export const cropsRouter = Router();
 
 const withFarm = { farm: { include: { owner: { select: { verification: true } } } } } as const;
+
+const suggestQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(30).default(10),
+});
+
+/**
+ * Picked for this buyer, with the reason attached.
+ *
+ * Scoring lives in src/suggestions.ts; this route's job is to hand it a
+ * sensible candidate set. Only listed crops with stock left, and a cap, because
+ * ranking happens in memory — at this size that's far cheaper than the SQL
+ * gymnastics the alternative needs, and it keeps the rules readable.
+ */
+cropsRouter.get(
+  "/suggested",
+  asyncHandler(async (req, res) => {
+    const { limit } = suggestQuery.parse(req.query);
+    const user = await currentUser(req);
+
+    const [signals, crops] = await Promise.all([
+      readSignals(user.id),
+      prisma.crop.findMany({
+        // Same visibility rule as the main feed. A suspended farmer's listings
+        // must not reappear through a side door.
+        where: { listed: true, farm: { owner: { status: "ACTIVE" } } },
+        include: withFarm,
+        orderBy: { createdAt: "desc" },
+        take: 300,
+      }),
+    ]);
+
+    const candidates = crops.map((c) => ({
+      id: c.id,
+      category: c.category,
+      farmId: c.farmId,
+      status: c.status,
+      expectedKg: c.expectedKg,
+      reservedKg: c.reservedKg,
+      farm: { name: c.farm.name, district: c.farm.district, districtKey: c.farm.districtKey },
+      sellerVerified: c.farm.owner.verification === "VERIFIED",
+    }));
+
+    const ranked = rank(candidates, signals, limit);
+    const byId = new Map(crops.map((c) => [c.id, c]));
+
+    res.json({
+      /** False when we're going on nothing but location — worth saying so. */
+      personalised: signals.categoryScore.size > 0 || signals.farmsBoughtFrom.size > 0,
+      count: ranked.length,
+      crops: ranked.map((r) => {
+        const c = byId.get(r.cropId)!;
+        const farmDistrict = resolveDistrict(c.farm.districtKey ?? c.farm.district);
+        return {
+          ...c,
+          farm: { ...c.farm, owner: undefined },
+          sellerVerified: c.farm.owner.verification === "VERIFIED",
+          distanceKm:
+            signals.origin && farmDistrict ? distanceKm(signals.origin, farmDistrict) : null,
+          reason: r.reason,
+        };
+      }),
+    });
+  }),
+);
 
 /** Districts the app offers in its filter dropdown. */
 cropsRouter.get(

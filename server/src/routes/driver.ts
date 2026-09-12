@@ -5,6 +5,7 @@ import { prisma } from "../db.js";
 import { requireDriver } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 import { normalisePlate } from "../lib/plate.js";
+import { onDelivered, onLoaded } from "../payouts.js";
 
 export const driverRouter = Router();
 
@@ -163,6 +164,12 @@ driverRouter.post(
       }
       return b;
     });
+
+    // The driver confirming the load is what frees a farmer's advance, and
+    // delivery starts the clock on the balance. Both are deliberately driven
+    // from here — a third party's action, not the farmer's own claim.
+    if (next === "LOADED") await onLoaded(updated.orderId);
+    if (next === "DELIVERED") await onDelivered(updated.orderId);
 
     res.json(updated);
   }),
