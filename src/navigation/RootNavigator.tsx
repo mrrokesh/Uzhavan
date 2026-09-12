@@ -15,6 +15,7 @@ import { servesRole } from "../lib/appInfo";
 // Buyer
 import { BookTruckOrder, ConfirmPurchase, QuantityConfirmed } from "../screens/AcceptFlow";
 import { CropDetail } from "../screens/CropDetail";
+import { Checkout } from "../screens/Checkout";
 import { FarmerProfile } from "../screens/FarmerProfile";
 import { HomeFeed } from "../screens/HomeFeed";
 import { MyOrders, Profile } from "../screens/OrdersProfile";
@@ -30,6 +31,7 @@ import { FarmerRequests } from "../screens/farmer/Requests";
 import { FarmerRequestDetail } from "../screens/farmer/RequestDetail";
 import { FarmerAccount } from "../screens/farmer/FarmerAccount";
 import { Demand } from "../screens/farmer/Demand";
+import { FarmerPayouts } from "../screens/farmer/Payouts";
 
 // Driver
 import { DriverJobs } from "../screens/driver/Jobs";
@@ -129,6 +131,7 @@ function BuyerApp() {
         <BuyerStack.Screen name="NewTicket" component={NewTicket} />
         <BuyerStack.Screen name="TicketDetail" component={TicketDetail} />
         <BuyerStack.Screen name="Announcements" component={Announcements} />
+        <BuyerStack.Screen name="Checkout" component={Checkout} />
       </BuyerStack.Navigator>
     </AppProvider>
   );
@@ -167,6 +170,7 @@ function FarmerApp() {
       <FarmerStack.Screen name="TicketDetail" component={TicketDetail} />
       <FarmerStack.Screen name="Announcements" component={Announcements} />
       <FarmerStack.Screen name="Demand" component={Demand} />
+      <FarmerStack.Screen name="FarmerPayouts" component={FarmerPayouts} />
     </FarmerStack.Navigator>
   );
 }

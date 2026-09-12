@@ -141,15 +141,20 @@ export function QuantityConfirmed() {
     setWorking(true);
     try {
       await setTransport.mutateAsync({ id: orderId, transport });
-      if (transport === "BOOK") navigation.replace("BookTruckOrder", { orderId });
-      else navigation.navigate("Tabs");
+      // Payment first. Nothing is reserved with the farmer, and no truck is
+      // worth booking, until the money is actually in escrow.
+      navigation.replace("Checkout", { orderId });
     } finally {
       setWorking(false);
     }
   };
 
   return (
-    <Screen footer={<PrimaryButton label="Continue" onPress={go} loading={working} disabled={working} />}>
+    <Screen
+      footer={
+        <PrimaryButton label="Continue to payment" onPress={go} loading={working} disabled={working} />
+      }
+    >
       <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 24 }]}>
         <SuccessMark />
         <Text style={styles.h1}>Quantity confirmed!</Text>

@@ -72,6 +72,19 @@ export function FarmerHome() {
           <Text style={styles.ctaText}>List a new crop</Text>
         </Pressable>
 
+        <Pressable style={styles.demand} onPress={() => navigation.navigate("FarmerPayouts")}>
+          <View style={styles.demandIcon}>
+            <Ionicons name="wallet-outline" size={18} color={colors.forest} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.demandTitle}>Your money</Text>
+            <Text style={styles.demandSub}>
+              What buyers have paid, and when each part reaches your bank.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.faint} />
+        </Pressable>
+
         <Pressable style={styles.demand} onPress={() => navigation.navigate("Demand")}>
           <View style={styles.demandIcon}>
             <Ionicons name="trending-up-outline" size={18} color={colors.forest} />

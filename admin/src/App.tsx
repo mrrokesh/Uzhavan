@@ -16,6 +16,7 @@ import { Audit } from "./pages/Audit";
 import { Announcements } from "./pages/Announcements";
 import { Payments } from "./pages/Payments";
 import { Tracking } from "./pages/Tracking";
+import { Payouts } from "./pages/Payouts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ function Gate() {
         <Route path="tracking" element={<Tracking />} />
         <Route path="announcements" element={<Announcements />} />
         <Route path="payments" element={<Payments />} />
+        <Route path="payouts" element={<Payouts />} />
         <Route path="staff" element={<Staff />} />
         <Route path="settings" element={<Settings />} />
         <Route path="releases" element={<Releases />} />

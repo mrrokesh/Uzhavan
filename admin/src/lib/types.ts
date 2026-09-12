@@ -222,3 +222,29 @@ export type TrackedVehicle = {
     buyerPhone: string | null;
   } | null;
 };
+
+export type PayoutPolicy = "SPLIT_ON_LOAD" | "AFTER_DELIVERY";
+export type PayoutState = "HELD" | "RELEASED" | "PAID" | "FAILED" | "CANCELLED";
+
+export type AdminPayout = {
+  id: string;
+  stage: "ADVANCE" | "BALANCE";
+  stageLabel: string;
+  state: PayoutState;
+  amount: number;
+  policy: PayoutPolicy;
+  releaseAfter: string | null;
+  releasedAt: string | null;
+  paidAt: string | null;
+  note: string | null;
+  failureReason: string | null;
+  farmer: { id: string; name: string; verified: boolean; hasAccount: boolean };
+  order: { id: string; code: string; product: string; status: string; paidAt: string | null } | null;
+};
+
+export type PayoutList = {
+  policy: PayoutPolicy;
+  advancePercent: number;
+  holdHours: number;
+  payouts: AdminPayout[];
+};
