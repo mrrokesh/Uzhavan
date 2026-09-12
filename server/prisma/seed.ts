@@ -1,6 +1,7 @@
 import { PrismaClient, type Permission } from "@prisma/client";
 import { hashPassword } from "../src/auth.js";
 import { resolveDistrict } from "../src/data/districts.js";
+import { normalisePlate } from "../src/lib/plate.js";
 
 const prisma = new PrismaClient();
 
@@ -256,8 +257,8 @@ async function main() {
 
     await prisma.truck.upsert({
       where: { driverId: driver.id },
-      create: { driverId: driver.id, ...d.truck },
-      update: d.truck,
+      create: { driverId: driver.id, ...d.truck, plateKey: normalisePlate(d.truck.plate) },
+      update: { ...d.truck, plateKey: normalisePlate(d.truck.plate) },
     });
   }
 

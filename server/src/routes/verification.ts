@@ -12,6 +12,7 @@ import { audit } from "../audit.js";
 import { asyncHandler, HttpError } from "../http.js";
 import {
   isPlausibleFarmerCard,
+  isPlausibleLicence,
   isValidGSTIN,
   isValidPAN,
   isValidUdyam,
@@ -48,7 +49,12 @@ verificationRouter.get(
       required:
         user.role === "FARMER"
           ? { identifier: "farmerCard", documents: ["FARMER_CARD", "LAND_RECORD"] }
-          : { identifier: "gstinOrUdyam", documents: ["GST_CERTIFICATE", "MSME_CERTIFICATE"] },
+          : user.role === "DRIVER"
+            ? {
+                identifier: "licence",
+                documents: ["DRIVING_LICENCE", "VEHICLE_RC", "VEHICLE_INSURANCE", "VEHICLE_PERMIT"],
+              }
+            : { identifier: "gstinOrUdyam", documents: ["GST_CERTIFICATE", "MSME_CERTIFICATE"] },
     });
   }),
 );
@@ -59,6 +65,10 @@ const submitBody = z
     udyam: z.string().trim().optional(),
     pan: z.string().trim().optional(),
     farmerCard: z.string().trim().optional(),
+    licence: z.string().trim().optional(),
+    rcNumber: z.string().trim().optional(),
+    insuranceExpiry: z.string().date().optional(),
+    permitExpiry: z.string().date().optional(),
     documents: z
       .array(
         z.object({
@@ -68,6 +78,10 @@ const submitBody = z
             "GST_CERTIFICATE",
             "MSME_CERTIFICATE",
             "PAN_CARD",
+            "DRIVING_LICENCE",
+            "VEHICLE_RC",
+            "VEHICLE_INSURANCE",
+            "VEHICLE_PERMIT",
             "OTHER",
           ]),
           filename: z.string().trim().min(1).max(200),
@@ -90,8 +104,8 @@ verificationRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const user = await currentUser(req);
-    if (user.role !== "FARMER" && user.role !== "BUYER") {
-      throw new HttpError(403, "Only farmers and buyers need verification");
+    if (user.role !== "FARMER" && user.role !== "BUYER" && user.role !== "DRIVER") {
+      throw new HttpError(403, "Staff accounts don't need verification");
     }
     if (user.verification === "VERIFIED") {
       throw new HttpError(409, "This account is already verified");
@@ -106,7 +120,29 @@ verificationRouter.post(
     const data: Prisma.UserUncheckedUpdateInput = {};
     let shown: string;
 
-    if (user.role === "FARMER") {
+    if (user.role === "DRIVER") {
+      if (!body.licence) throw new HttpError(400, "Enter your driving licence number");
+      const value = normalise(body.licence);
+      if (!isPlausibleLicence(value)) {
+        throw new HttpError(400, "That doesn't look like a licence number, e.g. TN37 20190001234");
+      }
+      data.licenceEnc = encrypt(value);
+      data.licenceIndex = blindIndex(value);
+      shown = last4(value);
+
+      // Cover and permit lapse, and an expired one means the truck must not
+      // carry goods — record the dates so staff and the tracker can see them.
+      const driver = await prisma.driver.findUnique({ where: { userId: user.id } });
+      if (driver) {
+        const expiryPatch: Record<string, unknown> = {};
+        if (body.rcNumber) expiryPatch.rcNumber = normalise(body.rcNumber);
+        if (body.insuranceExpiry) expiryPatch.insuranceExpiry = new Date(body.insuranceExpiry);
+        if (body.permitExpiry) expiryPatch.permitExpiry = new Date(body.permitExpiry);
+        if (Object.keys(expiryPatch).length) {
+          await prisma.truck.updateMany({ where: { driverId: driver.id }, data: expiryPatch });
+        }
+      }
+    } else if (user.role === "FARMER") {
       if (!body.farmerCard) throw new HttpError(400, "Enter your farmer card number");
       const value = normalise(body.farmerCard);
       if (!isPlausibleFarmerCard(value)) {
@@ -241,10 +277,11 @@ verificationRouter.get(
       .parse(req.query.status ?? "PENDING");
 
     const users = await prisma.user.findMany({
-      where: { verification: status, role: { in: ["FARMER", "BUYER"] } },
+      where: { verification: status, role: { in: ["FARMER", "BUYER", "DRIVER"] } },
       orderBy: { verificationSubmittedAt: "asc" },
       include: {
         farm: { select: { name: true, district: true, location: true } },
+        driver: { include: { truck: true } },
         documents: {
           select: { id: true, type: true, filename: true, mimeType: true, sizeBytes: true },
         },
@@ -268,6 +305,17 @@ verificationRouter.get(
         udyam: tryDecrypt(u.udyamEnc),
         pan: tryDecrypt(u.panEnc),
         farmerCard: tryDecrypt(u.farmerCardEnc),
+        licence: tryDecrypt(u.licenceEnc),
+        // Reviewers need the vehicle papers alongside the licence.
+        truck: u.driver?.truck
+          ? {
+              name: u.driver.truck.name,
+              plate: u.driver.truck.plate,
+              rcNumber: u.driver.truck.rcNumber,
+              insuranceExpiry: u.driver.truck.insuranceExpiry,
+              permitExpiry: u.driver.truck.permitExpiry,
+            }
+          : null,
         documents: u.documents,
       })),
     );

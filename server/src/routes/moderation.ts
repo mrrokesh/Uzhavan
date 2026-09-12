@@ -5,6 +5,7 @@ import { audit } from "../audit.js";
 import { requirePermission } from "../permissions.js";
 import { publicUser, requireStaff } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { normalisePlate } from "../lib/plate.js";
 
 export const moderationRouter = Router();
 
@@ -155,5 +156,114 @@ moderationRouter.post(
     });
 
     res.json(publicUser(updated));
+  }),
+);
+
+// ---- Track a shipment by vehicle ----------------------------------------
+
+const trackQuery = z.object({
+  plate: z.string().trim().min(3, "Enter at least part of a number plate"),
+});
+
+/**
+ * Staff lookup: someone rings up about a truck and all they have is the number
+ * on the side. Find the vehicle, who is driving it, and where its load is.
+ *
+ * Plates get typed with and without spaces, so both are matched.
+ */
+moderationRouter.get(
+  "/track",
+  asyncHandler(async (req, res) => {
+    await requirePermission(req, "ORDERS_VIEW");
+    const { plate } = trackQuery.parse(req.query);
+    const bare = normalisePlate(plate);
+
+    const trucks = await prisma.truck.findMany({
+      where: { plateKey: { contains: bare } },
+      include: {
+        driver: {
+          include: {
+            user: { select: { id: true, name: true, phone: true, status: true, verification: true } },
+          },
+        },
+        bookings: {
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          include: {
+            order: {
+              include: {
+                crop: { select: { title: true, imageKey: true, farm: { select: { name: true, location: true } } } },
+                buyer: { select: { id: true, name: true, business: true, phone: true } },
+              },
+            },
+            events: { orderBy: { createdAt: "asc" } },
+          },
+        },
+      },
+      take: 10,
+    });
+
+    if (trucks.length === 0) {
+      throw new HttpError(404, `No vehicle matching "${plate}"`);
+    }
+
+    const LIVE = ["PAID", "ACCEPTED", "ARRIVED_PICKUP", "LOADED", "IN_TRANSIT"];
+
+    res.json(
+      trucks.map((t) => {
+        const current = t.bookings.find((b) => LIVE.includes(b.status)) ?? null;
+        return {
+          truck: {
+            id: t.id,
+            name: t.name,
+            plate: t.plate,
+            body: t.body,
+            capacityKg: t.capacityKg,
+            rcNumber: t.rcNumber,
+            insuranceExpiry: t.insuranceExpiry,
+            permitExpiry: t.permitExpiry,
+            /// Surface lapsed paperwork here — this is exactly when it matters.
+            insuranceExpired: !!t.insuranceExpiry && t.insuranceExpiry < new Date(),
+            permitExpired: !!t.permitExpiry && t.permitExpiry < new Date(),
+          },
+          driver: {
+            id: t.driver.id,
+            name: t.driver.name,
+            phone: t.driver.user.phone,
+            rating: t.driver.rating,
+            trips: t.driver.trips,
+            online: t.driver.online,
+            accountStatus: t.driver.user.status,
+            verification: t.driver.user.verification,
+          },
+          currentTrip: current
+            ? {
+                code: current.code,
+                status: current.status,
+                pickup: current.pickup,
+                destination: current.destination,
+                product: current.order.product,
+                quantityKg: current.order.quantityKg,
+                orderCode: current.order.code,
+                farm: current.order.crop?.farm?.name ?? null,
+                buyer: current.order.buyer.business ?? current.order.buyer.name,
+                buyerPhone: current.order.buyer.phone,
+                events: current.events,
+              }
+            : null,
+          recentTrips: t.bookings
+            .filter((b) => b.id !== current?.id)
+            .slice(0, 5)
+            .map((b) => ({
+              code: b.code,
+              status: b.status,
+              product: b.order.product,
+              quantityKg: b.order.quantityKg,
+              destination: b.destination,
+              deliveredAt: b.deliveredAt,
+            })),
+        };
+      }),
+    );
   }),
 );
