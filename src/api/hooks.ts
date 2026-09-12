@@ -29,6 +29,7 @@ import {
   type PaymentConfig,
   type PaymentStart,
   type PayoutLedger,
+  type Suggestions,
 } from "./types";
 
 export const keys = {
@@ -485,6 +486,19 @@ export function useSubmitVerification() {
       qc.invalidateQueries({ queryKey: ["verification"] });
       qc.invalidateQueries({ queryKey: keys.me });
     },
+  });
+}
+
+/**
+ * Crops picked for this buyer, each with the reason it was picked. Kept a touch
+ * stale on purpose — the ranking barely moves minute to minute, and a home
+ * screen that reshuffles while you're reading it is worse than a slightly old one.
+ */
+export function useSuggestions(limit = 8) {
+  return useQuery({
+    queryKey: ["suggestions", limit],
+    queryFn: () => api<Suggestions>(`/crops/suggested?limit=${limit}`),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -28,6 +28,7 @@ const SUITES = [
   ["phase", "Districts, filters, demand board, announcements, payments"],
   ["feat", "Announcements, demand, driver verification, gateways, tracking"],
   ["payout", "Platform fee, escrow scheduling, payout policy and overrides"],
+  ["suggest", "Interest signals, ranking, exclusions, cold start"],
 ];
 
 const run = (name) =>

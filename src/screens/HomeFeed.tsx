@@ -8,6 +8,7 @@ import { Screen } from "../components/Chrome";
 import { Chip } from "../components/ui";
 import { FeedCard } from "../components/Widgets";
 import { NotificationBell } from "../components/NotificationBell";
+import { SuggestedRow } from "../components/SuggestedRow";
 import { useApp } from "../context/AppContext";
 import { FilterBar, FilterSheet } from "../components/CropFilters";
 import type { CropFilters as Filters } from "../api/types";
@@ -91,6 +92,13 @@ export function HomeFeed() {
           onOpen={() => setSheetOpen(true)}
           onClear={() => setFilters({})}
         />
+
+        {/* Only on the unfiltered default view. Someone who has narrowed the
+            list to one district under ₹30 is answering their own question, and
+            a row of our picks underneath it is noise. */}
+        {filter === "for-you" && !search.trim() && Object.keys(filters).length === 0 ? (
+          <SuggestedRow onOpen={(id) => navigation.navigate("CropDetail", { id })} />
+        ) : null}
 
         <View style={{ marginTop: 16, gap: 12 }}>
           {cropsQuery.isLoading ? (
