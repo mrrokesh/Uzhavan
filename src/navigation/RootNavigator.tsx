@@ -1,7 +1,14 @@
+import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
+import * as Notifications from "expo-notifications";
+import { useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  DefaultTheme,
+  createNavigationContainerRef,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Logo } from "../components/Logo";
 import { AppProvider } from "../context/AppContext";
@@ -9,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 
 import { ChooseRole, CreateAccount, Login } from "../screens/Auth";
 import { WrongApp } from "../screens/WrongApp";
+import { ForgotPassword } from "../screens/ForgotPassword";
 import { Reconnect } from "../screens/Reconnect";
 import { servesRole } from "../lib/appInfo";
 
@@ -62,6 +70,40 @@ const FarmerStack = createNativeStackNavigator<FarmerStackParamList>();
 const FarmerTab = createBottomTabNavigator<FarmerTabParamList>();
 const DriverStack = createNativeStackNavigator<DriverStackParamList>();
 const DriverTab = createBottomTabNavigator<DriverTabParamList>();
+
+export const navigationRef = createNavigationContainerRef();
+
+/**
+ * What happens when a notification arrives or is tapped.
+ *
+ * Arriving refreshes the bell, so the badge is right the moment the app is
+ * looked at. Tapping opens the thing it was about — a notification that dumps
+ * you on the home screen has wasted the tap.
+ */
+function useNotificationRouting() {
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    const received = Notifications.addNotificationReceivedListener(() => {
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+    });
+
+    const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as { kind?: string } | undefined;
+      if (!navigationRef.isReady()) return;
+      if (data?.kind === "announcement") {
+        // @ts-expect-error — the screen exists in every role's stack, but the
+        // three param lists are separate types and this ref is untyped.
+        navigationRef.navigate("Announcements");
+      }
+    });
+
+    return () => {
+      received.remove();
+      tapped.remove();
+    };
+  }, [qc]);
+}
 
 const theme = {
   ...DefaultTheme,
@@ -216,6 +258,7 @@ function AuthStack() {
       <AuthStackNav.Screen name="Login" component={Login} />
       <AuthStackNav.Screen name="ChooseRole" component={ChooseRole} />
       <AuthStackNav.Screen name="CreateAccount" component={CreateAccount} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPassword} />
     </AuthStackNav.Navigator>
   );
 }
@@ -231,9 +274,10 @@ function BootSplash() {
 
 export function RootNavigator() {
   const { ready, offline, token, role } = useAuth();
+  useNotificationRouting();
 
   return (
-    <NavigationContainer theme={theme}>
+    <NavigationContainer theme={theme} ref={navigationRef}>
       {!ready ? (
         <BootSplash />
       ) : offline ? (

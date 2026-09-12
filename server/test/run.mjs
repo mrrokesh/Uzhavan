@@ -29,6 +29,10 @@ const SUITES = [
   ["feat", "Announcements, demand, driver verification, gateways, tracking"],
   ["payout", "Platform fee, escrow scheduling, payout policy and overrides"],
   ["suggest", "Interest signals, ranking, exclusions, cold start"],
+  ["password", "Reset codes, enumeration, replay, guess limits, expiry"],
+  ["push", "Device registration, re-use, audience targeting"],
+  ["limits", "Account lockout, flood protection, what a user object may contain"],
+  ["reviews", "Ratings tied to completed orders, who may rate whom, averages"],
 ];
 
 const run = (name) =>

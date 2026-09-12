@@ -8,6 +8,7 @@ import { currentUser, publicUser } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 import { resolveDistrict } from "../data/districts.js";
 import { normalisePlate } from "../lib/plate.js";
+import { LIMITS, callerIp, clear, describeWait, enforce, lockoutSeconds } from "../ratelimit.js";
 
 export const authRouter = Router();
 
@@ -58,6 +59,8 @@ async function issue(userId: string) {
 authRouter.post(
   "/register",
   asyncHandler(async (req, res) => {
+    // Signup is cheap for us and cheap to automate; cap it per address.
+    enforce(req, "register", LIMITS.register);
     const body = registerBody.parse(req.body);
     const passwordHash = await hashPassword(body.password);
 
@@ -154,11 +157,36 @@ authRouter.post(
   "/login",
   asyncHandler(async (req, res) => {
     const { email, password } = loginBody.parse(req.body);
+
+    // Burst protection for the address, before anything touches the database.
+    enforce(req, "login", LIMITS.login);
+
     const user = await prisma.user.findUnique({ where: { email } });
+
+    // An account frozen by repeated failures. Checked before the password so a
+    // locked account can't be probed at leisure, and always temporary.
+    if (user?.lockedUntil && user.lockedUntil > new Date()) {
+      const wait = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
+      throw new HttpError(
+        429,
+        `Too many failed attempts. Try again in ${describeWait(wait)}, or reset your password.`,
+      );
+    }
 
     // Same error either way, so this can't be used to discover which emails
     // are registered.
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      if (user) {
+        const failures = user.failedLogins + 1;
+        const freeze = lockoutSeconds(failures);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLogins: failures,
+            lockedUntil: freeze > 0 ? new Date(Date.now() + freeze * 1000) : null,
+          },
+        });
+      }
       throw new HttpError(401, "Email or password is incorrect");
     }
 
@@ -187,6 +215,18 @@ authRouter.post(
         data: { passwordHash: await hashPassword(password) },
       });
     }
+
+    // A success clears both counters. One correct password should not leave
+    // someone throttled for the rest of the window.
+    if (user.failedLogins > 0 || user.lockedUntil) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() },
+      });
+    } else {
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    }
+    clear(`login:${callerIp(req)}`);
 
     res.json({ token: signToken(user.id), user: publicUser(user) });
   }),

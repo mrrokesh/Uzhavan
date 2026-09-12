@@ -54,6 +54,8 @@ cropsRouter.get(
       reservedKg: c.reservedKg,
       farm: { name: c.farm.name, district: c.farm.district, districtKey: c.farm.districtKey },
       sellerVerified: c.farm.owner.verification === "VERIFIED",
+      rating: c.farm.rating,
+      ratingCount: c.farm.ratingCount,
     }));
 
     const ranked = rank(candidates, signals, limit);

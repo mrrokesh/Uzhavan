@@ -113,7 +113,8 @@ Set `ADMIN_PASSWORD` in `server/.env` before going live and the seed uses that f
 7. **Delivery needs proof.** A driver cannot close a trip without recording who received the crop.
 8. **Farmers and drivers are never charged.** No commission, no platform fee. The fee is added on top of the price the farmer agreed and paid by the buyer, so a farmer's payout is exactly the number they accepted.
 9. **A farmer's advance is released by the driver, not the farmer.** A farmer saying they shipped is not evidence that they shipped.
-10. **A paid badge is never an identity badge.** *ID Verified* is free and document-backed; *Uzhavan Plus* is a paid subscription with its own separate badge. Selling a trust mark would let a fraudster buy credibility for the price of a subscription.
+10. **You can only rate someone you traded with**, once, after the crop arrived — and all three parties rate each other, not just the customer.
+11. **A paid badge is never an identity badge.** *ID Verified* is free and document-backed; *Uzhavan Plus* is a paid subscription with its own separate badge. Selling a trust mark would let a fraudster buy credibility for the price of a subscription.
 
 ---
 
@@ -155,6 +156,26 @@ The demand board is deliberately **aggregate**: volume, average price and accept
 
 ---
 
+## Reputation
+
+Every review hangs off a completed order. An unattached review is one anybody can write about anybody, which is how a ratings system stops meaning anything — here you can only rate a counterparty you actually traded with, once, after the crop arrived.
+
+Three directions, because all three parties take a risk:
+
+| Who | Rates | On |
+| --- | --- | --- |
+| Buyer | The farm | Was the crop what was described? |
+| Buyer | The driver | Did it arrive, on time, intact? |
+| Farmer | The buyer | Did they take the load and pay for it? |
+
+That last one matters more than it looks. A marketplace where only customers rate suppliers gives suppliers no way to warn each other about a buyer who cancels on arrival.
+
+A rating can be revised — a first reaction written on the day of a late delivery isn't always the fair one — but it stays one verdict per trade, so a single deal can never move an average as far as two. Averages are recomputed from the reviews rather than adjusted incrementally, because an incremental counter that drifts is worse than no counter. Below three reviews an average is noise dressed as a number, so the app shows "new" instead of a confident 5.0 off one opinion, and the suggestion ranking ignores it entirely.
+
+Reviews show a first name and a district, never a full business name. A wholesale buyer's name beside a one-star review is a grudge with an address on it.
+
+---
+
 ## Verification & trust
 
 | Role | Identifier | Documents |
@@ -174,6 +195,10 @@ Flow is `UNVERIFIED → PENDING → VERIFIED / REJECTED`, with a staff review qu
 - **Passwords**: bcrypt at cost 12 over an HMAC-SHA256 **pepper** held only in the environment. A stolen database is not crackable offline. Hashes are version-tagged and silently re-hashed at next login, so the pepper or cost can be rotated without resetting anyone's password.
 - **At rest**: AES-256-GCM over GSTIN, Udyam, PAN, farmer card, driving licence and every uploaded document. Deterministic **blind indexes** enforce "this GSTIN is already registered" without storing the plaintext.
 - **Documents** live in their own table so a multi-megabyte blob never enters an ordinary query, and are owner-or-reviewer only — a stranger gets a 404, not a 403.
+- **Password reset** is a six-digit code, not a link — it arrives over SMS as readily as email, and a farmer with one phone can read it and type it without leaving the app. Only a SHA-256 of the code is stored, it dies after 15 minutes or five wrong guesses, asking again kills the previous one, and a used code can't be replayed. The reply is identical whether or not the account exists, because otherwise this becomes a tool for discovering which of a list of emails are registered — on a marketplace, that's a list of a competitor's suppliers. Blocked accounts are never issued one.
+- **Guessing is bounded.** Five consecutive failed sign-ins freeze an account for a minute, then five, then thirty — progressive, and always expiring. A permanent lock would hand anyone a way to freeze a competitor out of their own account by failing their password enough times.
+- **Per-IP limits are an abuse ceiling, not the defence.** Carrier-grade NAT is the norm on Indian mobile networks, so one address can be thousands of unrelated people; a tight per-IP limit doesn't stop an attacker with a phone, it locks out a whole carrier. The real protection is per-account. Reset requests are additionally capped per *target* account, because each one costs a real person an SMS.
+- **A user object is an allowlist**, not a list of secrets to strip. It used to be the latter, and it failed exactly as denylists do — `licenceEnc` and `licenceIndex` were added to the schema later, nobody updated the strip list, and a driver's encrypted licence and its blind index went out to every client. A blind index is a deterministic HMAC: hand one over and candidate licence numbers can be tested offline until one matches. Listing what may leave means a new column is invisible until somebody decides otherwise, and a test asserts every secret column stays out.
 - **Blocking** is immediate: a token already issued stops working on the next request, a blocked driver goes offline, a blocked farmer's listings leave the marketplace.
 - **Payments**: amounts are decided server-side, signatures compared in constant time, webhook mounted before the JSON parser because Razorpay signs the exact bytes.
 - **Audit log** is append-only, with actor and before/after values on every privileged action.
@@ -205,6 +230,24 @@ Four are **admin-only and structurally non-delegable** — create/remove staff, 
 
 ---
 
+## Getting messages to people
+
+Two channels, each with a driver chosen by environment, and both defaulting to **`log`** — which prints the message to the server console instead of sending it. The whole password-reset flow therefore works on a laptop with no accounts anywhere, and a missing credential shows up as a visible log line rather than a message that silently never arrives.
+
+| Channel | Drivers |
+| --- | --- |
+| Email | `log` · `smtp` (any SMTP URL) |
+| SMS | `log` · `msg91` |
+| Push | Expo, no configuration |
+
+**Push** goes through Expo, so there are no APNs certificates to rotate and no per-platform code. Publishing an announcement sends to everyone it targets, skipping suspended and blocked accounts — someone who can't use the app shouldn't be pinged about it. Editing an already-published notice doesn't buzz anyone a second time; only the draft-to-live transition does. Tokens Expo reports as dead are deleted rather than retried forever, and a handset that changes hands follows the new account.
+
+A push is a courtesy on top of an action that already succeeded: the announcement is saved and shows on the bell whether or not any notification lands, and the send isn't awaited so an admin never waits on a push service.
+
+In production the server **refuses to boot** with both email and SMS on `log`, because a locked-out farmer would have no way back in. Delivery never throws into a request — nobody should see a 500 because an SMTP host is slow — and both channels are tried, since we don't know which one a given farmer actually reads.
+
+---
+
 ## Support desk
 
 Tickets get short, quotable codes like **`UZ-7F3K2`** — base-32 without the characters that get misheard (`I`, `O`, `0`, `1`).
@@ -223,7 +266,7 @@ Mode is read from the key id rather than asked for, so `rzp_live_` can't be misl
 
 Buyer checkout runs Razorpay's hosted page in a WebView. Their React Native SDK is a native module and can't run in Expo Go; the hosted page is the same code path, holds no secret, and the server recomputes the signature before believing any of it.
 
-**Uzhavan Plus** is ₹499 for 12 months, renewals extend rather than reset.
+**Uzhavan Plus** is ₹499 for 12 months, renewals extend rather than reset — but it currently buys nothing. There is a price and a payment path and no benefits attached, which is why no screen sells it: shipping that would be selling nothing. It exists as a deliberately separate tier so a paid badge can never be mistaken for a document-backed one; deciding what it should actually include is an open product question.
 
 
 ---
@@ -289,7 +332,7 @@ Tabs: **Home · My Crops · Requests · Profile**
 **Driver** — job board with online toggle · my trips · trip detail with the status stepper · profile & truck settings
 Tabs: **Jobs · My Trips · Profile**
 
-**Shared** — sign in · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · wrong-app · reconnect
+**Shared** — sign in · **forgot password** · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · wrong-app · reconnect
 
 ---
 
@@ -299,9 +342,10 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 
 | Area | Routes |
 | --- | --- |
-| Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` |
-| Profile | `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
+| Auth | `POST /auth/register` · `POST /auth/login` · `GET /auth/me` · `POST /auth/password/forgot｜reset` |
+| Profile | `PUT/DELETE /me/push-token` · `GET/PATCH /me` · `PUT/DELETE /me/follows/:cropId` · `PUT/DELETE /me/saved/:cropId` |
 | Suggestions | `GET /crops/suggested?limit=` |
+| Reviews | `GET/POST /orders/:id/reviews` · `GET /reviews/:subject/:subjectId` |
 | Browse | `GET /crops` (`status` `q` `farmId` `following` `district` `radiusKm` `verifiedOnly` `category` `minPrice` `maxPrice` `sort`) · `GET /crops/:id` · `GET /crops/districts` |
 | Verification | `GET/POST /verification` · `GET /verification/documents/:id` · `GET /verification/queue` · `POST /verification/queue/:userId` |
 | Farmer | `GET /farmer/summary` · `PATCH /farmer/farm` · `GET/POST /farmer/crops` · `PATCH/DELETE /farmer/crops/:id` · `GET /farmer/requests` · `POST /farmer/requests/:id/accept｜decline` · `GET /farmer/orders` · `GET /farmer/demand` |
@@ -365,7 +409,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by seven end-to-end suites — **358 assertions** — run against a live server and a real database:
+The API is covered by eleven end-to-end suites — **452 assertions** — run against a live server and a real database:
 
 ```bash
 cd server
@@ -383,6 +427,10 @@ npm test             # in another
 | `feat` (96) | Announcement audiences, demand privacy, driver verification, gateway switching, plate lookup |
 | `payout` (41) | Platform fee floor and ceiling, escrow scheduling, payout policy, overrides |
 | `suggest` (22) | Interest signals moving the ranking, exclusions, cold start, honest reasons |
+| `password` (22) | Reset codes, account enumeration, replay, guess limits, expiry, blocked accounts |
+| `push` (21) | Device registration, re-use by a new account, audience targeting, exclusions |
+| `limits` (24) | Account lockout and its expiry, flood protection, what a user object may contain |
+| `reviews` (27) | Ratings tied to completed orders, who may rate whom, averages, anonymity |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 
