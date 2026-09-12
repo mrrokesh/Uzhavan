@@ -158,6 +158,9 @@ model User {
   // Buyer profile (null for farmers / drivers)
   business         String?
   district         String?
+  /// Resolved district for the buyer's warehouse — the default origin when
+  /// they search "near me".
+  districtKey      String?
   warehouse        String?
   warehouseAddress String?
   market           String?
@@ -354,11 +357,17 @@ model Farm {
   name      String
   ownerName String
   district  String
+  /// Free-text `district` resolved to one of Tamil Nadu's 38 districts, so
+  /// radius filtering runs as an indexed IN rather than in memory.
+  /// See src/data/districts.ts.
+  districtKey String?
   location  String
   rating    Float  @default(5)
   avatarKey String @default("arul")
   crops     Crop[]
   createdAt DateTime @default(now())
+
+  @@index([districtKey])
 }
 
 model Crop {

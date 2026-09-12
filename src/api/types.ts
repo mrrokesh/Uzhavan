@@ -78,7 +78,27 @@ export type ApiCrop = {
   imageKey: string;
   galleryKeys: string[];
   listed: boolean;
+  sellerVerified?: boolean;
+  distanceKm?: number | null;
   _count?: { requests: number; orders: number };
+};
+
+/** `/crops` returns the result set plus where it searched from. */
+export type CropSearch = {
+  origin: string | null;
+  radiusKm: number | null;
+  count: number;
+  crops: ApiCrop[];
+};
+
+export type CropFilters = {
+  district?: string;
+  radiusKm?: number;
+  verifiedOnly?: boolean;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: "newest" | "distance" | "priceLow" | "priceHigh";
 };
 
 export type ApiDriver = {
@@ -254,6 +274,8 @@ export type Crop = {
   avatar: ImageSourcePropType;
   requestCount: number;
   orderCount: number;
+  sellerVerified: boolean;
+  distanceKm: number | null;
 };
 
 export type Driver = {
@@ -316,6 +338,8 @@ export function toCrop(c: ApiCrop): Crop {
     avatar: imageFor(c.farm.avatarKey),
     requestCount: c._count?.requests ?? 0,
     orderCount: c._count?.orders ?? 0,
+    sellerVerified: c.sellerVerified ?? false,
+    distanceKm: c.distanceKm ?? null,
   };
 }
 
@@ -491,4 +515,31 @@ export type AppConfig = {
     releaseNotes: string | null;
     storeUrl: string | null;
   };
+};
+
+// ---- Farmer demand board ---------------------------------------------------
+
+export type DemandBoard = {
+  origin: string | null;
+  radiusKm: number;
+  districtsInRange: number;
+  trends: {
+    category: string;
+    requests: number;
+    totalKg: number;
+    avgPricePerKg: number | null;
+    acceptRate: number;
+    /** True when this farm lists nothing in a category buyers are asking for. */
+    gap: boolean;
+  }[];
+  buyers: {
+    id: string;
+    name: string;
+    business: string | null;
+    district: string | null;
+    market: string | null;
+    verified: boolean;
+    orders: number;
+    distanceKm: number | null;
+  }[];
 };

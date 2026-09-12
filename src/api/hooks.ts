@@ -10,6 +10,9 @@ import {
   type ApiRequest,
   type ApiTruck,
   type Crop,
+  type CropFilters,
+  type CropSearch,
+  type DemandBoard,
   type DriverSummary,
   type FarmerSummary,
   type Fare,
@@ -65,18 +68,43 @@ export function useUpdateProfile() {
 export function useCrops(
   filter: "for-you" | "ready" | "upcoming" | "following",
   search = "",
+  filters: CropFilters = {},
 ) {
   return useQuery({
-    queryKey: keys.crops(filter, search),
-    queryFn: async (): Promise<Crop[]> => {
+    queryKey: [...keys.crops(filter, search), filters],
+    queryFn: async (): Promise<{ origin: string | null; crops: Crop[] }> => {
       const params = new URLSearchParams();
       if (filter === "ready" || filter === "upcoming") params.set("status", filter);
       if (filter === "following") params.set("following", "true");
       if (search.trim()) params.set("q", search.trim());
+      if (filters.district) params.set("district", filters.district);
+      if (filters.radiusKm) params.set("radiusKm", String(filters.radiusKm));
+      if (filters.verifiedOnly) params.set("verifiedOnly", "true");
+      if (filters.category) params.set("category", filters.category);
+      if (filters.minPrice !== undefined) params.set("minPrice", String(filters.minPrice));
+      if (filters.maxPrice !== undefined) params.set("maxPrice", String(filters.maxPrice));
+      if (filters.sort) params.set("sort", filters.sort);
       const qs = params.toString();
-      const rows = await api<ApiCrop[]>(`/crops${qs ? `?${qs}` : ""}`);
-      return rows.map(toCrop);
+      const res = await api<CropSearch>(`/crops${qs ? `?${qs}` : ""}`);
+      return { origin: res.origin, crops: res.crops.map(toCrop) };
     },
+  });
+}
+
+/** The 38 Tamil Nadu districts, for the location picker. */
+export function useDistricts() {
+  return useQuery({
+    queryKey: ["districts"],
+    queryFn: () => api<string[]>("/crops/districts"),
+    staleTime: Infinity,
+  });
+}
+
+/** What buyers nearby are actually buying — the farmer's demand board. */
+export function useDemand(radiusKm = 200) {
+  return useQuery({
+    queryKey: ["demand", radiusKm],
+    queryFn: () => api<DemandBoard>(`/farmer/demand?radiusKm=${radiusKm}`),
   });
 }
 

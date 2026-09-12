@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -7,11 +8,13 @@ import { Screen } from "../components/Chrome";
 import { Chip } from "../components/ui";
 import { FeedCard } from "../components/Widgets";
 import { useApp } from "../context/AppContext";
+import { FilterBar, FilterSheet } from "../components/CropFilters";
+import type { CropFilters as Filters } from "../api/types";
 import { useCrops, useMe, useRequests, useToggleSaved } from "../api/hooks";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
 
-const filters = [
+const TABS = [
   { id: "for-you" as const, label: "For you" },
   { id: "ready" as const, label: "Ready now" },
   { id: "upcoming" as const, label: "Upcoming" },
@@ -22,13 +25,16 @@ export function HomeFeed() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { filter, setFilter, search, setSearch } = useApp();
 
-  const cropsQuery = useCrops(filter, search);
+  const [filters, setFilters] = useState<Filters>({});
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const cropsQuery = useCrops(filter, search, filters);
   const me = useMe();
   const requests = useRequests();
   const toggleSaved = useToggleSaved();
 
   const saved = me.data?.saved ?? [];
-  const rows = cropsQuery.data ?? [];
+  const rows = cropsQuery.data?.crops ?? [];
+  const origin = cropsQuery.data?.origin ?? null;
   // A real notification dot: the farmer has responded to something of yours.
   const hasUpdate = (requests.data ?? []).some((r) => r.status === "FARMER_ACCEPTED");
 
@@ -79,10 +85,17 @@ export function HomeFeed() {
           style={{ marginTop: 12 }}
           contentContainerStyle={{ gap: 8 }}
         >
-          {filters.map((f) => (
+          {TABS.map((f) => (
             <Chip key={f.id} label={f.label} active={filter === f.id} onPress={() => setFilter(f.id)} />
           ))}
         </ScrollView>
+
+        <FilterBar
+          filters={filters}
+          origin={origin}
+          onOpen={() => setSheetOpen(true)}
+          onClear={() => setFilters({})}
+        />
 
         <View style={{ marginTop: 16, gap: 12 }}>
           {cropsQuery.isLoading ? (
@@ -93,9 +106,13 @@ export function HomeFeed() {
             <Text style={styles.msg}>
               {search
                 ? `Nothing matches “${search}”.`
-                : filter === "following"
-                  ? "You’re not following any crops yet."
-                  : "No crops listed in this category yet."}
+                : filters.radiusKm
+                  ? `No crops within ${filters.radiusKm} km${origin ? ` of ${origin}` : ""}. Try widening the distance.`
+                  : filters.verifiedOnly
+                    ? "No verified farms match yet. Turn off the verified filter to see more."
+                    : filter === "following"
+                      ? "You’re not following any crops yet."
+                      : "No crops listed in this category yet."}
             </Text>
           ) : (
             rows.map((crop) => (
@@ -110,6 +127,13 @@ export function HomeFeed() {
           )}
         </View>
       </ScrollView>
+
+      <FilterSheet
+        visible={sheetOpen}
+        filters={filters}
+        onApply={setFilters}
+        onClose={() => setSheetOpen(false)}
+      />
     </Screen>
   );
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireFarm } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { districtsWithin, resolveDistrict } from "../data/districts.js";
 
 export const farmerRouter = Router();
 
@@ -48,7 +49,16 @@ farmerRouter.patch(
   asyncHandler(async (req, res) => {
     const { farm } = await requireFarm(req);
     const data = farmBody.parse(req.body);
-    res.json(await prisma.farm.update({ where: { id: farm.id }, data }));
+    res.json(
+      await prisma.farm.update({
+        where: { id: farm.id },
+        data: {
+          ...data,
+          // Keep the searchable key in step with whatever they typed.
+          ...(data.district ? { districtKey: resolveDistrict(data.district)?.name ?? null } : {}),
+        },
+      }),
+    );
   }),
 );
 
@@ -289,5 +299,118 @@ farmerRouter.get(
       orderBy: { createdAt: "desc" },
     });
     res.json(orders);
+  }),
+);
+
+// ---- Demand board --------------------------------------------------------
+
+const demandQuery = z.object({
+  radiusKm: z.coerce.number().int().min(25).max(800).default(200),
+});
+
+/**
+ * What buyers in the region are actually buying — the mirror of the buyer's
+ * crop feed, so a farmer can decide what's worth listing.
+ *
+ * Deliberately aggregate. Individual requests are a private negotiation
+ * between one buyer and one farm; showing them to a competing farm would leak
+ * commercial information. What's safe to share is the shape of demand and a
+ * directory of buyers who are open for business.
+ */
+farmerRouter.get(
+  "/demand",
+  asyncHandler(async (req, res) => {
+    const { farm } = await requireFarm(req);
+    const { radiusKm } = demandQuery.parse(req.query);
+
+    const origin = resolveDistrict(farm.districtKey ?? farm.district);
+    const nearby = origin ? districtsWithin(origin, radiusKm) : [];
+    const nearbyNames = nearby.map((d) => d.name);
+    const kmByDistrict = new Map(nearby.map((d) => [d.name, d.km]));
+
+    const scope = origin ? { districtKey: { in: nearbyNames } } : {};
+
+    const [requests, buyers, myCategories] = await Promise.all([
+      // Every request raised by a buyer in range, whoever the seller was.
+      prisma.cropRequest.findMany({
+        where: {
+          createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+          buyer: { ...scope, status: "ACTIVE" },
+        },
+        select: {
+          quantityKg: true,
+          estimatedValue: true,
+          finalPricePerKg: true,
+          status: true,
+          crop: { select: { category: true, title: true, pricePerKg: true } },
+        },
+      }),
+      prisma.user.findMany({
+        where: { role: "BUYER", status: "ACTIVE", ...scope },
+        select: {
+          id: true,
+          name: true,
+          business: true,
+          district: true,
+          districtKey: true,
+          market: true,
+          verification: true,
+          _count: { select: { orders: true } },
+        },
+        take: 50,
+      }),
+      prisma.crop.findMany({ where: { farmId: farm.id }, select: { category: true } }),
+    ]);
+
+    // Roll requests up by category.
+    const byCategory = new Map<
+      string,
+      { category: string; requests: number; totalKg: number; priceSum: number; priceN: number; accepted: number }
+    >();
+    for (const r of requests) {
+      const key = r.crop.category;
+      const row =
+        byCategory.get(key) ??
+        { category: key, requests: 0, totalKg: 0, priceSum: 0, priceN: 0, accepted: 0 };
+      row.requests += 1;
+      row.totalKg += r.quantityKg;
+      const price = r.finalPricePerKg ?? r.crop.pricePerKg;
+      row.priceSum += price;
+      row.priceN += 1;
+      if (r.status === "CONFIRMED" || r.status === "FARMER_ACCEPTED") row.accepted += 1;
+      byCategory.set(key, row);
+    }
+
+    const mine = new Set(myCategories.map((c) => c.category));
+    const trends = [...byCategory.values()]
+      .map((t) => ({
+        category: t.category,
+        requests: t.requests,
+        totalKg: t.totalKg,
+        avgPricePerKg: t.priceN ? Math.round(t.priceSum / t.priceN) : null,
+        acceptRate: t.requests ? Math.round((t.accepted / t.requests) * 100) : 0,
+        /// True when this farm doesn't list anything in a category buyers want.
+        gap: !mine.has(t.category),
+      }))
+      .sort((a, b) => b.totalKg - a.totalKg);
+
+    res.json({
+      origin: origin?.name ?? null,
+      radiusKm,
+      districtsInRange: nearbyNames.length,
+      trends,
+      buyers: buyers
+        .map((b) => ({
+          id: b.id,
+          name: b.name,
+          business: b.business,
+          district: b.district,
+          market: b.market,
+          verified: b.verification === "VERIFIED",
+          orders: b._count.orders,
+          distanceKm: b.districtKey ? (kmByDistrict.get(b.districtKey) ?? null) : null,
+        }))
+        .sort((a, b) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9)),
+    });
   }),
 );
