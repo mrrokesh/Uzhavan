@@ -87,6 +87,18 @@ const sweeper = startTicketSweeper();
 // Farmers waiting on money must not depend on an admin opening the console.
 const payoutSweeper = startPayoutSweeper();
 
+/**
+ * A backstop, not a licence to ignore errors.
+ *
+ * Node terminates the process on an unhandled rejection, which is right for a
+ * script and wrong for a server: a background chore that trips over a dropped
+ * connection should not take every in-flight request down with it. Anything
+ * landing here is a bug worth fixing at its source — hence the loud log.
+ */
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason instanceof Error ? reason.stack : reason);
+});
+
 async function shutdown() {
   clearInterval(sweeper);
   clearInterval(payoutSweeper);

@@ -142,7 +142,15 @@ export async function escalateStaleTickets(): Promise<{ assigned: number; bumped
  */
 export function startTicketSweeper(): NodeJS.Timeout {
   const everyMs = 15 * 60 * 1000;
+  // Swallow and log. `void escalateStaleTickets()` left the rejection
+  // unhandled, and Node terminates the process for that — so one transient
+  // pool timeout in a background chore took the whole API down with it.
+  const tick = () => {
+    escalateStaleTickets().catch((err) => {
+      console.error("[tickets] escalation sweep failed:", err instanceof Error ? err.message : err);
+    });
+  };
   // Kick off shortly after boot so a restart doesn't reset the clock.
-  setTimeout(() => void escalateStaleTickets(), 30_000);
-  return setInterval(() => void escalateStaleTickets(), everyMs);
+  setTimeout(tick, 30_000);
+  return setInterval(tick, everyMs);
 }
