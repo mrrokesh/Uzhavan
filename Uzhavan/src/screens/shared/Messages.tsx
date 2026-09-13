@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -97,9 +97,12 @@ export function ChatThread() {
   const [text, setText] = useState("");
   const [working, setWorking] = useState(false);
 
-  useFocusEffect(() => {
-    markRead.mutate();
-  });
+  const markReadMutate = markRead.mutate;
+  useFocusEffect(
+    useCallback(() => {
+      markReadMutate();
+    }, [markReadMutate]),
+  );
 
   const submit = async () => {
     const body = text.trim();
