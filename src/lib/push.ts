@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { api } from "./api";
-import { APP_KIND } from "./appInfo";
+import { APP_KIND, APP_NAME } from "./appInfo";
 
 /**
  * Registering this install for notifications.
@@ -56,7 +56,7 @@ async function ensureHandler(N: NotificationsModule): Promise<void> {
 async function ensureChannel(N: NotificationsModule): Promise<void> {
   if (Platform.OS !== "android") return;
   await N.setNotificationChannelAsync("default", {
-    name: "Uzhavan",
+    name: APP_NAME,
     importance: N.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: "#1B5E3B",
