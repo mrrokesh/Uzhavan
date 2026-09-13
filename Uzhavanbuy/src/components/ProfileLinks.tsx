@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Chip } from "./ui";
-import { useTickets, useVerification } from "../api/hooks";
+import { useConversations, useTickets, useVerification } from "../api/hooks";
 import { useAuth } from "../context/AuthContext";
 import type { SharedScreens } from "../navigation/types";
 import { colors, shadow } from "../theme";
@@ -35,6 +35,11 @@ export function ProfileLinks() {
     (t) => t.status !== "RESOLVED" && t.status !== "CLOSED",
   ).length;
 
+  // Chat is buyer-farmer only — a driver has no counterparty to message.
+  const canMessage = user?.role === "FARMER" || user?.role === "BUYER";
+  const conversations = useConversations();
+  const unreadCount = canMessage ? (conversations.data ?? []).filter((c) => c.unread).length : 0;
+
   return (
     <View style={styles.card}>
       {needsKyc ? (
@@ -58,10 +63,7 @@ export function ProfileLinks() {
         </Pressable>
       ) : null}
 
-      <Pressable
-        style={[styles.row, styles.last]}
-        onPress={() => navigation.navigate("Help")}
-      >
+      <Pressable style={styles.row} onPress={() => navigation.navigate("Help")}>
         <View style={styles.icon}>
           <Ionicons name="help-buoy-outline" size={17} color={colors.forest} />
         </View>
@@ -74,6 +76,33 @@ export function ProfileLinks() {
           </Text>
         </View>
         {openCount > 0 ? <Chip label={String(openCount)} tone="amber" /> : null}
+        <Ionicons name="chevron-forward" size={17} color={colors.faint} />
+      </Pressable>
+
+      {canMessage ? (
+        <Pressable style={styles.row} onPress={() => navigation.navigate("Messages")}>
+          <View style={styles.icon}>
+            <Ionicons name="chatbubbles-outline" size={17} color={colors.forest} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Messages</Text>
+            <Text style={styles.sub}>
+              {unreadCount > 0 ? `${unreadCount} unread` : "Chat with farmers and buyers"}
+            </Text>
+          </View>
+          {unreadCount > 0 ? <Chip label={String(unreadCount)} tone="amber" /> : null}
+          <Ionicons name="chevron-forward" size={17} color={colors.faint} />
+        </Pressable>
+      ) : null}
+
+      <Pressable style={[styles.row, styles.last]} onPress={() => navigation.navigate("Assistant")}>
+        <View style={styles.icon}>
+          <Ionicons name="sparkles-outline" size={17} color={colors.forest} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Ask a question</Text>
+          <Text style={styles.sub}>Crops, delivery, payments — answered from your data</Text>
+        </View>
         <Ionicons name="chevron-forward" size={17} color={colors.faint} />
       </Pressable>
     </View>

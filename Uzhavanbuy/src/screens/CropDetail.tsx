@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Chrome";
 import { Chip, PrimaryButton } from "../components/ui";
-import { useCrop, useMe, useToggleSaved } from "../api/hooks";
+import { useCrop, useMe, useStartConversation, useToggleSaved } from "../api/hooks";
+import { ApiError } from "../lib/api";
 import { inr, kg } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
@@ -17,6 +18,7 @@ export function CropDetail() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const me = useMe();
   const toggleSaved = useToggleSaved();
+  const startConversation = useStartConversation();
   const [slide, setSlide] = useState(0);
   const [more, setMore] = useState(false);
 
@@ -135,6 +137,22 @@ export function CropDetail() {
             <Text style={styles.link}>View farmer ›</Text>
           </Pressable>
 
+          <Pressable
+            style={styles.messageRow}
+            disabled={startConversation.isPending}
+            onPress={async () => {
+              try {
+                const convo = await startConversation.mutateAsync({ farmId: crop.farmId, cropId: crop.id });
+                navigation.navigate("ChatThread", { conversationId: convo.id, name: crop.farmName });
+              } catch (err) {
+                Alert.alert("Couldn’t open chat", err instanceof ApiError ? err.message : "Try again.");
+              }
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.forest} />
+            <Text style={styles.messageText}>Message farmer</Text>
+          </Pressable>
+
           <View style={styles.thumbs}>
             {crop.gallery.slice(0, 3).map((src, i) => (
               <Pressable key={i} onPress={() => setSlide(i)} style={{ flex: 1 }}>
@@ -219,6 +237,17 @@ const styles = StyleSheet.create({
   availText: { fontSize: 12, color: colors.forest, fontWeight: "500" },
   farmer: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, ...shadow },
   av: { width: 48, height: 48, borderRadius: 24 },
+  messageRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.mint,
+    borderRadius: 12,
+    paddingVertical: 11,
+  },
+  messageText: { fontSize: 13, fontWeight: "600", color: colors.forest },
   farm: { fontSize: 14, fontWeight: "600" },
   link: { fontSize: 12, fontWeight: "600", color: colors.forest },
   thumbs: { marginTop: 12, flexDirection: "row", gap: 8 },

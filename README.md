@@ -282,6 +282,14 @@ New tickets are **auto-assigned to the least-loaded eligible agent**. Payment an
 
 ---
 
+## Chat & assistant
+
+**Farmer ↔ buyer chat** is one thread per buyer-farm pair, not one per order — an ordinary running conversation, unlike a support ticket, which is deliberately one-per-issue. A buyer starts it from a crop's "Message farmer" button; opening it again from a different crop with the same farm lands on the same thread rather than forking a new one. Text only for now — `Message.kind` already has a `VOICE` branch in the schema, so adding it later is a new field going unused today rather than a migration touching every row that came before it.
+
+**The assistant** answers three things from the asker's own live data — what crops are listed, who's online to deliver, and where a payment stands — through a small set of hand-written intent matchers (`backend/src/assistant.ts`), not a language model. Every answer traces to a real row: it says so and stops rather than guessing when a question falls outside those three. That's a deliberate choice for now, not a limitation nobody noticed — an LLM layered on top of the same trusted data handlers, and a self-hosted TTS service for spoken replies (the `audioUrl`/`durationSec` columns already sit unused on `Message` for this), are both real options once there's a server to run them on. Neither is wired up yet.
+
+---
+
 ## Payments
 
 Razorpay, over plain REST rather than the SDK — order creation is one POST and signature checking is an HMAC, so a dependency would buy nothing and add supply-chain surface.
@@ -349,7 +357,7 @@ If the config request fails the app carries on. A network blip must never lock s
 
 ## Screens
 
-**Buyer** — Home feed with filters · crop detail · farmer profile · select quantity · review request · request details (live) · confirm purchase · **checkout** · book a truck · nearby trucks · review booking · track truck (live) · delivery receipt · My Orders · Profile
+**Buyer** — Home feed with filters · crop detail (with **message farmer**) · farmer profile · select quantity · review request · request details (live) · confirm purchase · **checkout** · book a truck · nearby trucks · review booking · track truck (live) · delivery receipt · My Orders · Profile
 Tabs: **Home · Book Track · My Orders · Profile**
 
 **Farmer** — dashboard · my listings · new/edit listing · request inbox · set price and accept/decline · **what buyers want** · **your money** · profile & sales
@@ -358,7 +366,7 @@ Tabs: **Home · My Crops · Requests · Profile**
 **Driver** — job board with online toggle · my trips · trip detail with the status stepper · profile & truck settings
 Tabs: **Jobs · My Trips · Profile**
 
-**Shared** — sign in · **forgot password** · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · wrong-app · reconnect
+**Shared** — sign in · **forgot password** · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · **messages · chat thread · ask a question** · wrong-app · reconnect
 
 ---
 
@@ -378,6 +386,8 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | Driver | `GET /driver/summary` · `PATCH /driver/availability｜truck` · `GET /driver/jobs｜trips` · `POST /driver/trips/:id/advance｜cancel` |
 | Buyer | `GET/POST /requests` · `POST /requests/:id/confirm｜decline｜cancel` · `GET /orders` · `GET/PATCH /orders/:id` · `GET /trucks?loadKg=` · `GET /bookings/quote/fare` · `POST /bookings` · `POST /bookings/:id/pay｜cancel` |
 | Support | `GET/POST /tickets` · `GET /tickets/:code` · `POST /tickets/:code/reply` · `GET /tickets/desk/queue｜stats` · `POST /tickets/desk/:code/assign｜status` |
+| Chat | `GET/POST /conversations` · `GET /conversations/by-crop/:cropId` · `GET/POST /conversations/:id/messages` · `POST /conversations/:id/read` |
+| Assistant | `POST /assistant/ask` |
 | Announcements | `GET /announcements` · `GET /announcements/unread-count` · `POST /announcements/:id/read` · `POST /announcements/read-all` |
 | Payments | `GET /payments` · `GET /payments/config` · `POST /payments/start｜confirm` · `POST /webhooks/razorpay` |
 | Payouts | `GET /payouts` · `POST /payouts/account` |
@@ -393,16 +403,17 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 ```
 User ─┬─ Farm ── Crop ──┬── CropRequest ── Order ── TruckBooking ── BookingEvent
       │                 ├── Follow / SavedCrop            │
+      │                 └── Conversation ── Message        │
       ├─ Driver ── Truck ┘                                │
       ├─ KycDocument                                      │
       ├─ Ticket ── TicketMessage                          │
       ├─ Payment ── PaymentGateway                        │
       ├─ LinkedAccount            Payout ─────────────────┤
       ├─ AnnouncementRead ── Announcement                 │
-      └─────────── (as buyer) ── Order ───────────────────┘
+      └─────────── (as buyer) ── Order / Conversation ────┘
 ```
 
-`Crop.reservedKg` rises as orders are confirmed, so availability is always `expectedKg − reservedKg`. `Farm.districtKey` and `Truck.plateKey` hold normalised, indexed forms so search is a lookup rather than a scan.
+`Crop.reservedKg` rises as orders are confirmed, so availability is always `expectedKg − reservedKg`. `Farm.districtKey` and `Truck.plateKey` hold normalised, indexed forms so search is a lookup rather than a scan. `Conversation` is unique per buyer-farm pair — one running thread, not one per order — and `Message.kind` carries an unused `VOICE` branch alongside `TEXT` so voice messages are a later field-population pass rather than a migration.
 
 ---
 
@@ -435,7 +446,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by eleven end-to-end suites — **459 assertions** — run against a live server and a real database:
+The API is covered by thirteen end-to-end suites — **495 assertions** — run against a live server and a real database:
 
 ```bash
 cd backend
@@ -457,6 +468,8 @@ npm test             # in another
 | `push` (21) | Device registration, re-use by a new account, audience targeting, exclusions |
 | `limits` (24) | Account lockout and its expiry, flood protection, what a user object may contain |
 | `reviews` (27) | Ratings tied to completed orders, who may rate whom, averages, anonymity |
+| `chat` (22) | Farmer/buyer conversations, thread dedup by farm, unread state, who can see what |
+| `assistant` (14) | Rule-based Q&A over live crops, drivers and orders, honesty about its own limits |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 

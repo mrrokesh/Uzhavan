@@ -33,6 +33,9 @@ import {
   type Reviewable,
   type Reputation,
   type ReviewSubject,
+  type Conversation,
+  type ChatMessage,
+  type AssistantAnswer,
 } from "./types";
 
 export const keys = {
@@ -699,6 +702,82 @@ export function useReplyToTicket(code: string | undefined) {
       qc.invalidateQueries({ queryKey: ["ticket", code] });
       qc.invalidateQueries({ queryKey: ["tickets"] });
     },
+  });
+}
+
+// ---- Chat -------------------------------------------------------------------
+
+/** Every conversation I'm in, either side. Polls, so a reply shows up unread. */
+export function useConversations() {
+  return useQuery({
+    queryKey: ["conversations"],
+    queryFn: () => api<Conversation[]>("/conversations"),
+    ...LIVE,
+  });
+}
+
+/** Starts one if it doesn't exist, or hands back the existing thread. */
+export function useStartConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { farmId: string; cropId?: string }) =>
+      api<Conversation>("/conversations", { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conversations"] }),
+  });
+}
+
+/** "Message the farmer" from a crop, without the caller knowing a farmId. */
+export function useConversationByCrop(cropId: string | undefined) {
+  return useQuery({
+    queryKey: ["conversation-by-crop", cropId ?? "none"],
+    enabled: !!cropId,
+    queryFn: () => api<Conversation | null>(`/conversations/by-crop/${cropId}`),
+  });
+}
+
+export function useMessages(conversationId: string | undefined) {
+  return useQuery({
+    queryKey: ["messages", conversationId ?? "none"],
+    enabled: !!conversationId,
+    queryFn: () => api<ChatMessage[]>(`/conversations/${conversationId}/messages`),
+    ...LIVE,
+  });
+}
+
+export function useSendMessage(conversationId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) =>
+      api<ChatMessage>(`/conversations/${conversationId}/messages`, {
+        method: "POST",
+        body: { body },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages", conversationId] });
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
+export function useMarkConversationRead(conversationId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api(`/conversations/${conversationId}/read`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conversations"] }),
+  });
+}
+
+// ---- Assistant ----------------------------------------------------------------
+
+/**
+ * Rule-based, not conversational — one question, one answer, from live data.
+ * Nothing is kept server-side between calls, so the exchange history on
+ * screen is local-only; refreshing the app starts a clean slate.
+ */
+export function useAskAssistant() {
+  return useMutation({
+    mutationFn: (question: string) =>
+      api<AssistantAnswer>("/assistant/ask", { method: "POST", body: { question } }),
   });
 }
 

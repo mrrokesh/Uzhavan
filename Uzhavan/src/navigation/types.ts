@@ -9,6 +9,9 @@ export type SharedScreens = {
   NewTicket: undefined;
   TicketDetail: { code: string };
   Announcements: undefined;
+  Messages: undefined;
+  ChatThread: { conversationId: string; name: string };
+  Assistant: undefined;
 };
 
 export type AuthStackParamList = {

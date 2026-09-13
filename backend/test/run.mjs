@@ -33,6 +33,8 @@ const SUITES = [
   ["push", "Device registration, re-use, audience targeting"],
   ["limits", "Account lockout, flood protection, what a user object may contain"],
   ["reviews", "Ratings tied to completed orders, who may rate whom, averages"],
+  ["chat", "Farmer/buyer conversations, thread dedup, unread state, access"],
+  ["assistant", "Rule-based Q&A over live crops, drivers and orders"],
 ];
 
 const run = (name) =>

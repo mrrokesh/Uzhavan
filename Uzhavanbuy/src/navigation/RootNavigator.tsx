@@ -51,6 +51,8 @@ import { DriverAccount } from "../screens/driver/DriverAccount";
 import { Verification } from "../screens/shared/Verification";
 import { Help, MyTickets, NewTicket, TicketDetail } from "../screens/shared/Support";
 import { Announcements } from "../screens/shared/Announcements";
+import { ChatThread, Messages } from "../screens/shared/Messages";
+import { Assistant } from "../screens/shared/Assistant";
 
 import { colors } from "../theme";
 import type {
@@ -182,6 +184,9 @@ function BuyerApp() {
         <BuyerStack.Screen name="TicketDetail" component={TicketDetail} />
         <BuyerStack.Screen name="Announcements" component={Announcements} />
         <BuyerStack.Screen name="Checkout" component={Checkout} />
+        <BuyerStack.Screen name="Messages" component={Messages} />
+        <BuyerStack.Screen name="ChatThread" component={ChatThread} />
+        <BuyerStack.Screen name="Assistant" component={Assistant} />
       </BuyerStack.Navigator>
     </AppProvider>
   );
@@ -221,6 +226,9 @@ function FarmerApp() {
       <FarmerStack.Screen name="Announcements" component={Announcements} />
       <FarmerStack.Screen name="Demand" component={Demand} />
       <FarmerStack.Screen name="FarmerPayouts" component={FarmerPayouts} />
+      <FarmerStack.Screen name="Messages" component={Messages} />
+      <FarmerStack.Screen name="ChatThread" component={ChatThread} />
+      <FarmerStack.Screen name="Assistant" component={Assistant} />
     </FarmerStack.Navigator>
   );
 }
@@ -254,6 +262,7 @@ function DriverApp() {
       <DriverStack.Screen name="NewTicket" component={NewTicket} />
       <DriverStack.Screen name="TicketDetail" component={TicketDetail} />
       <DriverStack.Screen name="Announcements" component={Announcements} />
+      <DriverStack.Screen name="Assistant" component={Assistant} />
     </DriverStack.Navigator>
   );
 }

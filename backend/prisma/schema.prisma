@@ -289,6 +289,8 @@ model User {
   buyerRatingCount  Int                @default(0)
   passwordResets    PasswordReset[]
   pushTokens        PushToken[]
+  conversations     Conversation[]     @relation("ConversationBuyer")
+  messagesSent      Message[]          @relation("MessageSender")
   linkedAccount     LinkedAccount?
   payouts           Payout[]           @relation("PayoutFarmer")
   payoutOverrides   Payout[]           @relation("PayoutOverride")
@@ -525,6 +527,66 @@ model Review {
   @@index([subject, subjectId])
 }
 
+/// Who a message came as. TEXT is the only kind sent today; VOICE is modeled
+/// now so voice notes are a second pass on the schema rather than a migration
+/// that has to touch every existing row.
+enum MessageKind {
+  TEXT
+  VOICE
+}
+
+/// One thread between a buyer and a farm. Exactly one per pair — like most
+/// marketplace chat, not one thread per order — so a running conversation
+/// about several crops over months doesn't fragment into a dozen dead threads.
+/// `crop` is only ever the one that started it, kept for context on the
+/// opening message; nothing stops the conversation moving on from there.
+model Conversation {
+  id      String  @id @default(cuid())
+  buyer   User    @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId String
+  farm    Farm    @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farmId  String
+  crop    Crop?   @relation(fields: [cropId], references: [id], onDelete: SetNull)
+  cropId  String?
+
+  messages Message[]
+
+  /// Denormalised so the conversation list sorts and previews without pulling
+  /// every message of every thread.
+  lastMessageAt   DateTime  @default(now())
+  lastMessageBody String?
+  /// Null means never opened. Compared against the other side's messages to
+  /// drive the unread count — read receipts, not delivery receipts.
+  buyerReadAt     DateTime?
+  farmerReadAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([buyerId, farmId])
+  @@index([farmId, lastMessageAt])
+  @@index([buyerId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+
+  kind        MessageKind @default(TEXT)
+  /// Text content. Required for TEXT, unused for VOICE.
+  body        String?
+  /// Where a VOICE message's audio lives — a route, once one exists, the same
+  /// way KYC documents are served: authenticated, owner-or-participant only.
+  audioUrl    String?
+  durationSec Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
 /// Where to reach one installation of the app.
 ///
 /// A person can have several — a phone and a tablet, or the buyer app and the
@@ -670,24 +732,25 @@ model KycDocument {
 }
 
 model Farm {
-  id          String   @id @default(cuid())
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId     String   @unique
-  name        String
-  ownerName   String
-  district    String
+  id            String         @id @default(cuid())
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId       String         @unique
+  name          String
+  ownerName     String
+  district      String
   /// Free-text `district` resolved to one of Tamil Nadu's 38 districts, so
   /// radius filtering runs as an indexed IN rather than in memory.
   /// See src/data/districts.ts.
-  districtKey String?
-  location    String
+  districtKey   String?
+  location      String
   /// Average of `ratingCount` reviews. 5 with no reviews is a placeholder, not
   /// a claim — the app shows "new" rather than five stars until there are some.
-  rating      Float    @default(5)
-  ratingCount Int      @default(0)
-  avatarKey   String   @default("arul")
-  crops       Crop[]
-  createdAt   DateTime @default(now())
+  rating        Float          @default(5)
+  ratingCount   Int            @default(0)
+  avatarKey     String         @default("arul")
+  crops         Crop[]
+  conversations Conversation[]
+  createdAt     DateTime       @default(now())
 
   @@index([districtKey])
 }
@@ -716,11 +779,14 @@ model Crop {
   /// Farmer can unlist without deleting history.
   listed           Boolean    @default(true)
 
-  requests  CropRequest[]
-  orders    Order[]
-  follows   Follow[]
-  saves     SavedCrop[]
-  createdAt DateTime      @default(now())
+  requests      CropRequest[]
+  orders        Order[]
+  follows       Follow[]
+  saves         SavedCrop[]
+  /// Which conversations opened on this crop. Purely informational context —
+  /// deleting the crop must not take a conversation's history with it.
+  conversations Conversation[]
+  createdAt     DateTime       @default(now())
 }
 
 model Driver {

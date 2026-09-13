@@ -689,3 +689,38 @@ export type Reputation = {
   established: boolean;
   reviews: Review[];
 };
+
+// ---- Chat -------------------------------------------------------------------
+
+export type ConversationParty =
+  | { kind: "farm"; id: string; name: string; avatarKey: string }
+  | { kind: "buyer"; id: string; name: string; avatarKey: string };
+
+export type Conversation = {
+  id: string;
+  with: ConversationParty;
+  crop: { id: string; title: string; imageKey: string } | null;
+  lastMessageAt: string;
+  lastMessageBody: string | null;
+  unread: boolean;
+};
+
+export type ChatMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  kind: "TEXT" | "VOICE";
+  body: string | null;
+  audioUrl: string | null;
+  durationSec: number | null;
+  createdAt: string;
+  sender: { id: string; name: string };
+};
+
+// ---- Assistant ---------------------------------------------------------------
+
+export type AssistantAnswer = {
+  intent: string;
+  text: string;
+  data?: unknown;
+};
