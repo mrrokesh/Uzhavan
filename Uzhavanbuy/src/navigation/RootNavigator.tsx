@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
-import type * as NotificationsModule from "expo-notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -13,20 +12,13 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Logo } from "../components/Logo";
 import { AppProvider } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
-import { isExpoGo } from "../lib/push";
-
-// expo-notifications throws the instant it's imported under Expo Go (SDK
-// 53+), so it must never be statically imported here — only required when
-// we know we're in a real build. See ../lib/push.ts for the full story.
-const Notifications: typeof NotificationsModule | null = isExpoGo
-  ? null
-  : (require("expo-notifications") as typeof NotificationsModule);
 
 import { ChooseRole, CreateAccount, Login } from "../screens/Auth";
 import { WrongApp } from "../screens/WrongApp";
 import { ForgotPassword } from "../screens/ForgotPassword";
 import { Reconnect } from "../screens/Reconnect";
 import { servesRole } from "../lib/appInfo";
+import { listenForNotifications } from "../lib/push";
 
 // Buyer
 import { BookTruckOrder, ConfirmPurchase, QuantityConfirmed } from "../screens/AcceptFlow";
@@ -87,30 +79,36 @@ export const navigationRef = createNavigationContainerRef();
  * Arriving refreshes the bell, so the badge is right the moment the app is
  * looked at. Tapping opens the thing it was about — a notification that dumps
  * you on the home screen has wasted the tap.
+ *
+ * The subscription is set up through lib/push, which loads expo-notifications
+ * lazily. Importing it here directly would crash the app on launch inside Expo
+ * Go, where remote push no longer exists.
  */
 function useNotificationRouting() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!Notifications) return;
+    let teardown: (() => void) | undefined;
+    let cancelled = false;
 
-    const received = Notifications.addNotificationReceivedListener(() => {
-      qc.invalidateQueries({ queryKey: ["announcements"] });
-    });
-
-    const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as { kind?: string } | undefined;
-      if (!navigationRef.isReady()) return;
-      if (data?.kind === "announcement") {
-        // @ts-expect-error — the screen exists in every role's stack, but the
-        // three param lists are separate types and this ref is untyped.
-        navigationRef.navigate("Announcements");
-      }
+    void listenForNotifications({
+      onReceived: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
+      onTapped: (data) => {
+        if (!navigationRef.isReady()) return;
+        if (data.kind === "announcement") {
+          // @ts-expect-error — the screen exists in every role's stack, but the
+          // three param lists are separate types and this ref is untyped.
+          navigationRef.navigate("Announcements");
+        }
+      },
+    }).then((stop) => {
+      if (cancelled) stop();
+      else teardown = stop;
     });
 
     return () => {
-      received.remove();
-      tapped.remove();
+      cancelled = true;
+      teardown?.();
     };
   }, [qc]);
 }

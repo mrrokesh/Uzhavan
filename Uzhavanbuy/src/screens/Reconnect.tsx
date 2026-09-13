@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Logo } from "../components/Logo";
 import { OutlineButton, PrimaryButton } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { APP_NAME } from "../lib/appInfo";
 import { colors } from "../theme";
 
 /**
@@ -20,7 +21,7 @@ export function Reconnect() {
         <Ionicons name="cloud-offline-outline" size={32} color={colors.forest} />
       </View>
 
-      <Text style={styles.h1}>Can’t reach Uzhavan</Text>
+      <Text style={styles.h1}>Can’t reach {APP_NAME}</Text>
       <Text style={styles.body}>
         You’re still signed in — we just couldn’t get through to the server. Check your connection
         and try again.

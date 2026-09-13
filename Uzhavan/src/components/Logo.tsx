@@ -1,13 +1,21 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
+import { APP_NAME } from "../lib/appInfo";
 import { colors } from "../theme";
 
+/**
+ * The wordmark, which is whichever app this build is.
+ *
+ * It was hardcoded to "Uzhavan", so Uzhavan Buy shipped with the wrong name at
+ * the top of every screen — the launcher icon and splash said one thing and the
+ * app itself said another. Reading APP_NAME keeps the two from drifting again.
+ */
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <View style={styles.row}>
       <Ionicons name="leaf" size={compact ? 20 : 24} color={colors.forest} />
-      <Text style={[styles.word, compact && { fontSize: 18 }]}>Uzhavan</Text>
+      <Text style={[styles.word, compact && { fontSize: 18 }]}>{APP_NAME}</Text>
     </View>
   );
 }

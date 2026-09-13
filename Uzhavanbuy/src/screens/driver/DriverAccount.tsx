@@ -10,6 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import { imageFor } from "../../lib/images";
 import { ApiError } from "../../lib/api";
 import { inr } from "../../lib/format";
+import { APP_NAME } from "../../lib/appInfo";
 import { colors, shadow } from "../../theme";
 
 export function DriverAccount() {
@@ -130,7 +131,7 @@ export function DriverAccount() {
         <View style={{ marginTop: 20, flexDirection: "row" }}>
           <OutlineButton label="Sign out" tone="danger" icon="log-out-outline" onPress={() => void signOut()} />
         </View>
-        <Text style={styles.foot}>Uzhavan · Direct from Tamil Nadu farms</Text>
+        <Text style={styles.foot}>{APP_NAME} · Direct from Tamil Nadu farms</Text>
       </ScrollView>
     </Screen>
   );

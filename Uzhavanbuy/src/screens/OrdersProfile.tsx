@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import { imageFor } from "../lib/images";
 import { inr, kg } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
+import { APP_NAME } from "../lib/appInfo";
 import { colors, shadow } from "../theme";
 
 const REQUEST_TONE: Record<RequestStatus, "amber" | "mint" | "neutral"> = {
@@ -204,7 +205,7 @@ export function Profile() {
         <View style={{ marginTop: 8, flexDirection: "row" }}>
           <OutlineButton label="Sign out" tone="danger" icon="log-out-outline" onPress={() => void signOut()} />
         </View>
-        <Text style={styles.foot}>Uzhavan · Direct from Tamil Nadu farms</Text>
+        <Text style={styles.foot}>{APP_NAME} · Direct from Tamil Nadu farms</Text>
       </ScrollView>
     </Screen>
   );
