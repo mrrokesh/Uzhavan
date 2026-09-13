@@ -98,7 +98,16 @@ Every seeded account uses the password **`uzhavan123`**.
 | Admin | `admin@uzhavan.app` — console only |
 | Staff | `staff@uzhavan.app` — console only |
 
-Set `ADMIN_PASSWORD` in `server/.env` before going live and the seed uses that for the admin instead.
+Set `ADMIN_PASSWORD` in `server/.env` before the first seed and the admin gets that instead.
+
+**Once the admin account exists, that variable is not how you change its password.** Re-seeding a live database must never silently reset someone's login, so the seed only applies `ADMIN_PASSWORD` when you set it explicitly. To change any account's password:
+
+```bash
+cd server
+npm run set-password -- admin@uzhavan.app 'a long passphrase'
+```
+
+It runs against whatever `DATABASE_URL` points at, so it works on production too. A plain SQL `UPDATE` will not do: hashes are HMAC-peppered before bcrypt, and anything written by hand won't verify.
 
 ---
 

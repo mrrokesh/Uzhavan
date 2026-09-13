@@ -295,7 +295,15 @@ async function main() {
       phone: "+91 80000 00001",
       avatarKey: "buyer",
     },
-    update: { role: "ADMIN" },
+    // Deliberately does not touch the password by default: re-seeding a live
+    // database must never silently reset the admin's login. Set ADMIN_PASSWORD
+    // to say you mean it, or use `npm run set-password`.
+    update: {
+      role: "ADMIN",
+      ...(process.env.ADMIN_PASSWORD
+        ? { passwordHash: await hashPassword(process.env.ADMIN_PASSWORD) }
+        : {}),
+    },
   });
 
   await prisma.user.upsert({
