@@ -475,7 +475,9 @@ cd frontend && npm run typecheck
 
 ## Deploying
 
-[`render.yaml`](render.yaml) is a Render Blueprint defining both hosted pieces — the API as a Node web service and the console as a static site. [`DEPLOY.md`](DEPLOY.md) has the full walkthrough, including the per-database Postgres role, the TLS settings, and the environment variables Render prompts for.
+The API and the console deploy independently of each other, on different hosts if you like — they only need to agree on two environment variables.
+
+**API → Render.** [`render.yaml`](render.yaml) is a Blueprint for it (and optionally the console too, as a static site). [`DEPLOY.md`](DEPLOY.md) has the full walkthrough: the per-database Postgres role, the TLS settings, and every variable Render prompts for.
 
 The database is **not** in the blueprint. It stays on the existing Ubuntu box, and that single decision drives most of what the guide has to say:
 
@@ -483,10 +485,22 @@ The database is **not** in the blueprint. It stays on the existing Ubuntu box, a
 - **Port 5432 has to stay open to the internet**, because Render's outbound addresses aren't fixed. Give Uzhavan its own limited Postgres role first — the `postgres` superuser currently unlocks all 43 databases on that box *and* grants shell through `COPY ... FROM PROGRAM`.
 - **Render's free plan sleeps** after fifteen minutes, and the next request waits about fifty seconds. Fine for a demo, not for someone standing in a field.
 
-Two things the build needed before it could deploy at all, both fixed:
+**Console → Vercel** (or any static host that isn't the same origin as the API). Two things it needs, on two different platforms:
 
-- The admin console called `/api` same-origin and relied on Vite's dev proxy, so on any static host every call would have 404'd. It now takes an absolute `VITE_API_URL` when it can't be proxied, and stays same-origin when it can.
+| Where | Variable | Value |
+| --- | --- | --- |
+| Vercel → `frontend` env vars | `VITE_API_URL` | The API's URL, e.g. `https://uzhavan-api.onrender.com` — no trailing slash |
+| Render → API env vars | `CORS_ORIGIN` | The console's URL, e.g. `https://uzhavan.vercel.app` |
+
+`VITE_API_URL` is read at **build** time, so setting it doesn't take effect until the next deploy. Without it the console calls `/api/...` as a relative path, which resolves to its own domain and 404s — there is no server there to proxy it, unlike the local dev setup where Vite's dev server does that for you. Set Vercel's **Root Directory** to `frontend` if the project wasn't created from that subfolder directly.
+
+[`frontend/vercel.json`](frontend/vercel.json) rewrites every path to `index.html`, which React Router needs — Vercel serves static files by default and has no reason to know that `/tickets` should fall back to the client-side router rather than 404.
+
+Three things the build needed before it could deploy at all, all fixed:
+
+- The console called `/api` same-origin and relied on Vite's dev proxy, so on any static host every call would 404. It now takes an absolute `VITE_API_URL` when it can't be proxied, and stays same-origin when it can.
 - `npm run build` emitted to `dist/src/index.js` while `npm start` looked for `dist/index.js`, because the typecheck config also covers `prisma/*.ts` and that pushes the inferred root up a level. Production would have died on boot with "cannot find module". There's now a separate build config that pins `rootDir`, and typechecking still covers the seed scripts.
+- The console had no SPA fallback for a static host, so a direct load or refresh of any route but `/` was a 404 rather than the app.
 
 ---
 
@@ -514,8 +528,8 @@ If the database is shared with other applications, keep `connection_limit` in `D
 
 - **Uzhavan Plus in the app.** The subscription works server-side; there's no screen to buy it.
 - **A real Razorpay account.** No gateway is configured, so checkout, Route linked accounts and transfers have only ever been exercised against their refusal paths. The suites assert the scheduling and the clean 503 — not a completed payment.
-- **Deployment.** Nothing here is hosted.
-- **Hardware.** The two-app split and everything after it has been verified by typecheck and API tests, not on a physical phone.
+- **Deployment is in progress, not finished.** The console is going up on Vercel and the API on Render; as of writing they haven't been pointed at each other yet (`VITE_API_URL` / `CORS_ORIGIN`, above), so a login attempt against the live console 404s.
+- **Hardware verification is partial.** Both mobile apps launch on a physical device post-reorg, and each shows its own correct name and branding — that much is confirmed, not assumed. A full walkthrough of sign-in, checkout and the newer screens (payouts, reviews, suggestions) hasn't been re-run since the split into independent `Uzhavan/` / `Uzhavanbuy/` projects.
 
 ### Known operational issue
 
