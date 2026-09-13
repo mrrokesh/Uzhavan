@@ -6,12 +6,13 @@ import { titleCase, when } from "../lib/format";
 import { Card, Empty, Field, KycBadge, Modal, NoAccess, Spinner, StatusBadge } from "../components/ui";
 import type { AccountRow, AccountStatus } from "../lib/types";
 
+const ACCOUNT_STATUSES = new Set(["ACTIVE", "SUSPENDED", "BLOCKED"]);
+
 export function Accounts() {
   const { can } = useAuth();
   const qc = useQueryClient();
   const [role, setRole] = useState("");
-  const [status, setStatus] = useState("");
-  const [verification, setVerification] = useState("");
+  const [state, setState] = useState("");
   const [q, setQ] = useState("");
   const [target, setTarget] = useState<AccountRow | null>(null);
   const [nextStatus, setNextStatus] = useState<AccountStatus>("BLOCKED");
@@ -19,12 +20,11 @@ export function Accounts() {
   const [error, setError] = useState<string | null>(null);
 
   const accounts = useQuery({
-    queryKey: ["accounts", role, status, verification, q],
+    queryKey: ["accounts", role, state, q],
     queryFn: () => {
       const p = new URLSearchParams();
       if (role) p.set("role", role);
-      if (status) p.set("status", status);
-      if (verification) p.set("verification", verification);
+      if (state) p.set(ACCOUNT_STATUSES.has(state) ? "status" : "verification", state);
       if (q.trim()) p.set("q", q.trim());
       return api<AccountRow[]>(`/admin/users${p.toString() ? `?${p}` : ""}`);
     },
@@ -78,18 +78,19 @@ export function Accounts() {
           <option value="FARMER">Farmers</option>
           <option value="DRIVER">Drivers</option>
         </select>
-        <select style={{ width: 150 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select style={{ width: 180 }} value={state} onChange={(e) => setState(e.target.value)}>
           <option value="">Any status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
-          <option value="BLOCKED">Blocked</option>
-        </select>
-        <select style={{ width: 170 }} value={verification} onChange={(e) => setVerification(e.target.value)}>
-          <option value="">Any verification</option>
-          <option value="UNVERIFIED">Unverified</option>
-          <option value="PENDING">Pending</option>
-          <option value="VERIFIED">Verified</option>
-          <option value="REJECTED">Rejected</option>
+          <optgroup label="Account status">
+            <option value="ACTIVE">Active</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="BLOCKED">Blocked</option>
+          </optgroup>
+          <optgroup label="Verification">
+            <option value="UNVERIFIED">Unverified</option>
+            <option value="PENDING">Pending</option>
+            <option value="VERIFIED">Verified</option>
+            <option value="REJECTED">Rejected</option>
+          </optgroup>
         </select>
       </div>
 
