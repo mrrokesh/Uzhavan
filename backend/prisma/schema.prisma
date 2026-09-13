@@ -291,6 +291,7 @@ model User {
   pushTokens        PushToken[]
   conversations     Conversation[]     @relation("ConversationBuyer")
   messagesSent      Message[]          @relation("MessageSender")
+  notifications     Notification[]
   linkedAccount     LinkedAccount?
   payouts           Payout[]           @relation("PayoutFarmer")
   payoutOverrides   Payout[]           @relation("PayoutOverride")
@@ -585,6 +586,37 @@ model Message {
   createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+/// A request accepted, an order confirmed, a driver taking the job, a
+/// delivery landing — the personal events push exists for. Kept alongside
+/// PushToken/Message rather than folded into Announcement: an announcement is
+/// one row many people read, this is one row for exactly one person, and
+/// mixing the two shapes would mean every read needs to know which kind of
+/// row it's looking at.
+enum NotificationKind {
+  REQUEST_ACCEPTED
+  REQUEST_DECLINED
+  ORDER_CONFIRMED
+  DRIVER_ACCEPTED
+  DELIVERED
+}
+
+model Notification {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  kind  NotificationKind
+  title String
+  body  String
+  /// Extra context for the tap target - e.g. { orderId } or { requestId }.
+  data  Json?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 /// Where to reach one installation of the app.

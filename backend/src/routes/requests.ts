@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { code, requireRole } from "../session.js";
 import { platformFeeBps, quote } from "../fees.js";
 import { asyncHandler, HttpError } from "../http.js";
+import { notify } from "../notifications.js";
 
 export const requestsRouter = Router();
 
@@ -208,6 +209,12 @@ requestsRouter.post(
         data: { reservedKg: { increment: request.quantityKg } },
       });
       return created;
+    });
+
+    await notify(request.crop.farm.ownerId, "ORDER_CONFIRMED", {
+      title: "Order confirmed",
+      body: `${buyer.business ?? buyer.name} confirmed ${order.quantityKg} kg of ${order.product} — book a truck once it's ready.`,
+      data: { orderId: order.id },
     });
 
     res.status(201).json(order);

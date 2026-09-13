@@ -6,6 +6,7 @@ import { requireDriver } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 import { normalisePlate } from "../lib/plate.js";
 import { onDelivered, onLoaded } from "../payouts.js";
+import { notify } from "../notifications.js";
 
 export const driverRouter = Router();
 
@@ -121,7 +122,7 @@ const advanceBody = z.object({
 driverRouter.post(
   "/trips/:id/advance",
   asyncHandler(async (req, res) => {
-    const { driver } = await requireDriver(req);
+    const { user: driverUser, driver } = await requireDriver(req);
     const { to, receivedBy } = advanceBody.parse(req.body ?? {});
 
     const booking = await prisma.truckBooking.findUnique({
@@ -170,6 +171,21 @@ driverRouter.post(
     // from here — a third party's action, not the farmer's own claim.
     if (next === "LOADED") await onLoaded(updated.orderId);
     if (next === "DELIVERED") await onDelivered(updated.orderId);
+
+    if (next === "ACCEPTED") {
+      await notify(updated.order.buyerId, "DRIVER_ACCEPTED", {
+        title: "Driver on the way",
+        body: `${driverUser.name} accepted the job for ${updated.order.product} and is headed to the farm.`,
+        data: { bookingId: updated.id },
+      });
+    }
+    if (next === "DELIVERED") {
+      await notify(updated.order.buyerId, "DELIVERED", {
+        title: "Delivered",
+        body: `${updated.order.product} was delivered — received by ${updated.proofReceivedBy}.`,
+        data: { bookingId: updated.id },
+      });
+    }
 
     res.json(updated);
   }),

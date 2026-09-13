@@ -1,25 +1,28 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useUnreadAnnouncements } from "../api/hooks";
+import { useUnreadAnnouncements, useUnreadNotifications } from "../api/hooks";
 import { colors, shadow } from "../theme";
 
 /**
  * The bell every home screen carries. The badge count comes from the server,
  * not from what happens to be loaded, so it's right before the list is opened.
+ * Announcements and personal notifications are two separate feeds server-side,
+ * but one bell — nobody should have to check two badges to know they're caught up.
  */
 export function NotificationBell() {
   const navigation = useNavigation<{ navigate: (screen: string) => void }>();
-  const unread = useUnreadAnnouncements();
-  const count = unread.data?.count ?? 0;
+  const announcements = useUnreadAnnouncements();
+  const notifications = useUnreadNotifications();
+  const count = (announcements.data?.count ?? 0) + (notifications.data?.count ?? 0);
 
   return (
     <Pressable
-      onPress={() => navigation.navigate("Announcements")}
+      onPress={() => navigation.navigate("Notifications")}
       style={styles.bell}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel={count > 0 ? `Announcements, ${count} unread` : "Announcements"}
+      accessibilityLabel={count > 0 ? `Notifications, ${count} unread` : "Notifications"}
     >
       <Ionicons name="notifications-outline" size={20} color={colors.ink} />
       {count > 0 ? (

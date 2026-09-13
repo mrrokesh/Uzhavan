@@ -274,6 +274,24 @@ In production the server **refuses to boot** with both email and SMS on `log`, b
 
 ---
 
+## Notifications
+
+Two feeds, one bell. **Announcements** are one row broadcast to many people — admin-published, audience-targeted, covered above. **Personal notifications** are one row per recipient: a farmer accepting or declining a request, an order getting confirmed, a driver taking the job, a delivery landing. The bell badge sums both unread counts; opening it shows your own activity first, with a link through to Announcements for the broadcast side.
+
+| Event | Who's told |
+| --- | --- |
+| Farmer accepts a request | The buyer |
+| Farmer declines a request | The buyer |
+| Buyer confirms → order created | The farmer |
+| Driver accepts the job | The buyer |
+| Delivered | The buyer |
+
+Personal notifications ride the same push pipeline as announcements — write the row first, push is a courtesy on top — so the in-app list is always right even when Expo's service isn't reachable.
+
+**Push cannot be tested in Expo Go.** Since Expo SDK 53, Expo Go's Android build no longer supports remote push at all — the module throws the moment it's imported. `lib/push.ts` detects this (`IS_EXPO_GO`) and skips registration silently rather than crashing the app, so nothing breaks — but no push, announcement or personal, will ever arrive while running through Expo Go. The in-app bell and notification list work regardless; push itself starts working the moment the app runs from a real EAS build instead, with nothing else to configure.
+
+---
+
 ## Support desk
 
 Tickets get short, quotable codes like **`UZ-7F3K2`** — base-32 without the characters that get misheard (`I`, `O`, `0`, `1`).
@@ -366,7 +384,7 @@ Tabs: **Home · My Crops · Requests · Profile**
 **Driver** — job board with online toggle · my trips · trip detail with the status stepper · profile & truck settings
 Tabs: **Jobs · My Trips · Profile**
 
-**Shared** — sign in · **forgot password** · choose role · create account · verification · **announcements** · help & support · my issues · raise an issue · ticket thread · **messages · chat thread · ask a question** · wrong-app · reconnect
+**Shared** — sign in · **forgot password** · choose role · create account · verification · **announcements · notifications** · help & support · my issues · raise an issue · ticket thread · **messages · chat thread · ask a question** · wrong-app · reconnect
 
 ---
 
@@ -389,6 +407,7 @@ All routes are under `/api`. Everything except `/health`, `/app/config`, `/auth/
 | Chat | `GET/POST /conversations` · `GET /conversations/by-crop/:cropId` · `GET/POST /conversations/:id/messages` · `POST /conversations/:id/read` |
 | Assistant | `POST /assistant/ask` |
 | Announcements | `GET /announcements` · `GET /announcements/unread-count` · `POST /announcements/:id/read` · `POST /announcements/read-all` |
+| Notifications | `GET /notifications` · `GET /notifications/unread-count` · `POST /notifications/:id/read` · `POST /notifications/read-all` |
 | Payments | `GET /payments` · `GET /payments/config` · `POST /payments/start｜confirm` · `POST /webhooks/razorpay` |
 | Payouts | `GET /payouts` · `POST /payouts/account` |
 | Admin | `GET /admin/me｜permissions｜overview｜audit` · `GET /admin/users` · `POST /admin/users/:id/status` · `GET /admin/track?plate=` · `GET /admin/payouts` · `POST /admin/payouts/:id/override｜sweep` · staff, settings, releases, gateways, announcements |
@@ -410,10 +429,11 @@ User ─┬─ Farm ── Crop ──┬── CropRequest ── Order ── 
       ├─ Payment ── PaymentGateway                        │
       ├─ LinkedAccount            Payout ─────────────────┤
       ├─ AnnouncementRead ── Announcement                 │
+      ├─ Notification                                     │
       └─────────── (as buyer) ── Order / Conversation ────┘
 ```
 
-`Crop.reservedKg` rises as orders are confirmed, so availability is always `expectedKg − reservedKg`. `Farm.districtKey` and `Truck.plateKey` hold normalised, indexed forms so search is a lookup rather than a scan. `Conversation` is unique per buyer-farm pair — one running thread, not one per order — and `Message.kind` carries an unused `VOICE` branch alongside `TEXT` so voice messages are a later field-population pass rather than a migration.
+`Crop.reservedKg` rises as orders are confirmed, so availability is always `expectedKg − reservedKg`. `Farm.districtKey` and `Truck.plateKey` hold normalised, indexed forms so search is a lookup rather than a scan. `Conversation` is unique per buyer-farm pair — one running thread, not one per order — and `Message.kind` carries an unused `VOICE` branch alongside `TEXT` so voice messages are a later field-population pass rather than a migration. `Notification` is one row per recipient (unlike `Announcement`, one row read by many), tagged with a `NotificationKind` so the app can pick an icon without parsing the title.
 
 ---
 
@@ -446,7 +466,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by thirteen end-to-end suites — **495 assertions** — run against a live server and a real database:
+The API is covered by fourteen end-to-end suites — **528 assertions** — run against a live server and a real database:
 
 ```bash
 cd backend
@@ -458,7 +478,7 @@ npm test             # in another
 | Suite | Covers |
 | --- | --- |
 | `e2e` (51) | The full loop, role enforcement, stock reservation, truck capacity, driver trip steps, request edits |
-| `sec` (47) | Peppered hashing, encryption at rest, KYC, document access, blocking, live revocation |
+| `sec` (49) | Peppered hashing, encryption at rest, KYC, document access, blocking, live revocation |
 | `admin` (63) | Permissions, non-delegable rights, tickets, escalation, remote config, update gating, audit |
 | `phase` (45) | District distance, filters, demand board, announcements, payments, vehicle tracking |
 | `feat` (96) | Announcement audiences, demand privacy, driver verification, gateway switching, plate lookup |
@@ -470,6 +490,7 @@ npm test             # in another
 | `reviews` (27) | Ratings tied to completed orders, who may rate whom, averages, anonymity |
 | `chat` (22) | Farmer/buyer conversations, thread dedup by farm, unread state, who can see what |
 | `assistant` (14) | Rule-based Q&A over live crops, drivers and orders, honesty about its own limits |
+| `notifications` (31) | Personal notifications through the order lifecycle, unread state, access, ordering |
 
 They're integration tests on purpose: permissions, encryption and money all live in the seams between Express, Prisma and Postgres rather than inside any one function. **Run `db:reset` first** — several suites move state that can't be undone through the API, so a second run without one fails on its own leavings rather than on a bug.
 

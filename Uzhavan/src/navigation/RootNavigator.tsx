@@ -53,6 +53,7 @@ import { Help, MyTickets, NewTicket, TicketDetail } from "../screens/shared/Supp
 import { Announcements } from "../screens/shared/Announcements";
 import { ChatThread, Messages } from "../screens/shared/Messages";
 import { Assistant } from "../screens/shared/Assistant";
+import { Notifications } from "../screens/shared/Notifications";
 
 import { colors } from "../theme";
 import type {
@@ -183,6 +184,7 @@ function BuyerApp() {
         <BuyerStack.Screen name="NewTicket" component={NewTicket} />
         <BuyerStack.Screen name="TicketDetail" component={TicketDetail} />
         <BuyerStack.Screen name="Announcements" component={Announcements} />
+        <BuyerStack.Screen name="Notifications" component={Notifications} />
         <BuyerStack.Screen name="Checkout" component={Checkout} />
         <BuyerStack.Screen name="Messages" component={Messages} />
         <BuyerStack.Screen name="ChatThread" component={ChatThread} />
@@ -224,6 +226,7 @@ function FarmerApp() {
       <FarmerStack.Screen name="NewTicket" component={NewTicket} />
       <FarmerStack.Screen name="TicketDetail" component={TicketDetail} />
       <FarmerStack.Screen name="Announcements" component={Announcements} />
+      <FarmerStack.Screen name="Notifications" component={Notifications} />
       <FarmerStack.Screen name="Demand" component={Demand} />
       <FarmerStack.Screen name="FarmerPayouts" component={FarmerPayouts} />
       <FarmerStack.Screen name="Messages" component={Messages} />

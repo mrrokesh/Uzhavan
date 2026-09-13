@@ -65,6 +65,8 @@ async function main() {
   await prisma.passwordReset.deleteMany({});
   await prisma.pushToken.deleteMany({});
   await prisma.linkedAccount.deleteMany({});
+  // Personal activity notifications - tied to the requests/orders/trips just cleared above.
+  await prisma.notification.deleteMany({});
 
   console.log(
     "Cleared orders, trips, requests, reviews, payouts, KYC, lockouts, tokens. Reservations released.",

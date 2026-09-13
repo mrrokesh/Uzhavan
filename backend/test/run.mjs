@@ -35,6 +35,7 @@ const SUITES = [
   ["reviews", "Ratings tied to completed orders, who may rate whom, averages"],
   ["chat", "Farmer/buyer conversations, thread dedup, unread state, access"],
   ["assistant", "Rule-based Q&A over live crops, drivers and orders"],
+  ["notifications", "Personal activity notifications through the order lifecycle"],
 ];
 
 const run = (name) =>

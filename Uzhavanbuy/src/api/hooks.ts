@@ -36,6 +36,7 @@ import {
   type Conversation,
   type ChatMessage,
   type AssistantAnswer,
+  type AppNotification,
 } from "./types";
 
 export const keys = {
@@ -658,6 +659,41 @@ export function useMarkAllAnnouncementsRead() {
   return useMutation({
     mutationFn: () => api<{ marked: number }>("/announcements/read-all", { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
+  });
+}
+
+// ---- Notifications ----------------------------------------------------------
+
+/** My own activity - a request accepted, an order confirmed, a delivery. */
+export function useNotifications() {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => api<AppNotification[]>("/notifications"),
+  });
+}
+
+/** Drives the bell badge alongside unread announcements. */
+export function useUnreadNotifications() {
+  return useQuery({
+    queryKey: ["notifications", "unread"],
+    queryFn: () => api<{ count: number }>("/notifications/unread-count"),
+    refetchInterval: 120_000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<{ read: boolean }>(`/notifications/${id}/read`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ marked: number }>("/notifications/read-all", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }
 

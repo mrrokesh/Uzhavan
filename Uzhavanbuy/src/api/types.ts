@@ -724,3 +724,22 @@ export type AssistantAnswer = {
   text: string;
   data?: unknown;
 };
+
+// ---- Notifications -------------------------------------------------------
+
+export type NotificationKind =
+  | "REQUEST_ACCEPTED"
+  | "REQUEST_DECLINED"
+  | "ORDER_CONFIRMED"
+  | "DRIVER_ACCEPTED"
+  | "DELIVERED";
+
+export type AppNotification = {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  readAt: string | null;
+  createdAt: string;
+};

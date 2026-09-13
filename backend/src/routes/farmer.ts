@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { requireFarm } from "../session.js";
 import { asyncHandler, HttpError } from "../http.js";
 import { districtsWithin, resolveDistrict } from "../data/districts.js";
+import { notify } from "../notifications.js";
 
 export const farmerRouter = Router();
 
@@ -249,6 +250,11 @@ farmerRouter.post(
       },
       include: { crop: { include: { farm: true } } },
     });
+    await notify(request.buyerId, "REQUEST_ACCEPTED", {
+      title: "Request accepted",
+      body: `${farm.name} priced ${updated.crop.title} at ₹${updated.finalPricePerKg}/kg — confirm to place the order.`,
+      data: { requestId: request.id },
+    });
     res.json(updated);
   }),
 );
@@ -278,6 +284,11 @@ farmerRouter.post(
         respondedAt: new Date(),
       },
       include: { crop: { include: { farm: true } } },
+    });
+    await notify(request.buyerId, "REQUEST_DECLINED", {
+      title: "Request declined",
+      body: `${farm.name} declined your request for ${updated.crop.title}: ${updated.declineReason}`,
+      data: { requestId: request.id },
     });
     res.json(updated);
   }),
