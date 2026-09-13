@@ -564,7 +564,9 @@ If the database is shared with other applications, keep `connection_limit` in `D
 - **A real Razorpay account.** No gateway is configured, so checkout, Route linked accounts and transfers have only ever been exercised against their refusal paths. The suites assert the scheduling and the clean 503 — not a completed payment.
 - **Checkout, payouts, reviews and suggestions haven't been walked through on a physical device.** Sign-in, the home feed, crop browsing, farmer-buyer chat (both directions, both apps), the assistant, and editing a pending request are all confirmed working on hardware. The later-stage screens simply haven't come up in testing yet.
 
-The console is live on Vercel, the API on Render, and `VITE_API_URL` / `CORS_ORIGIN` are confirmed pointed at each other. Getting there required a real tradeoff: Vercel's Hobby plan blocks a deploy outright when the triggering commit's author isn't a member of the Vercel team, with no free way to add one for a private repo — so the repo was made public to get past it, which means the source, including the business rules above, is now visible to anyone. Worth knowing if you're deciding how to host your own fork.
+The console is live on Vercel, the API on Render, and `VITE_API_URL` / `CORS_ORIGIN` are confirmed pointed at each other.
+
+**This repo has to stay public for Vercel to keep deploying it**, on the plan it's currently on. Vercel's Hobby plan blocks a deploy outright when the triggering commit's author isn't a member of the Vercel team, with no free way to add one for a private repo — every push while this repo was briefly switched back to private sat blocked rather than deploying, silently, until it went public again. That's a real tradeoff: the source, including the business rules above, is visible to anyone for as long as it stays public. Worth knowing if you're deciding how to host your own fork, or upgrading Vercel's plan to get private-repo deploys back.
 
 ### Known operational issue
 
