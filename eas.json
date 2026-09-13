@@ -1,27 +1,42 @@
 {
-  "cli": { "version": ">= 5.0.0" },
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
+  },
   "build": {
     "uzhavan": {
       "channel": "uzhavan",
-      "env": { "UZHAVAN_APP": "farmer" },
-      "android": { "buildType": "app-bundle" }
+      "env": {
+        "UZHAVAN_APP": "farmer"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     },
     "uzhavan-preview": {
       "extends": "uzhavan",
       "distribution": "internal",
       "channel": "uzhavan-preview",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk"
+      }
     },
     "uzhavan-buy": {
       "channel": "uzhavan-buy",
-      "env": { "UZHAVAN_APP": "buy" },
-      "android": { "buildType": "app-bundle" }
+      "env": {
+        "UZHAVAN_APP": "buy"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     },
     "uzhavan-buy-preview": {
       "extends": "uzhavan-buy",
       "distribution": "internal",
       "channel": "uzhavan-buy-preview",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

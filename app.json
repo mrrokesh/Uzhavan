@@ -28,6 +28,17 @@
           "color": "#1B5E3B"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "38fba8ba-6220-4aab-9a73-acd311b46a55"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/38fba8ba-6220-4aab-9a73-acd311b46a55"
+    }
   }
 }
