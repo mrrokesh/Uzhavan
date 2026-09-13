@@ -11,6 +11,7 @@ export function Accounts() {
   const qc = useQueryClient();
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
+  const [verification, setVerification] = useState("");
   const [q, setQ] = useState("");
   const [target, setTarget] = useState<AccountRow | null>(null);
   const [nextStatus, setNextStatus] = useState<AccountStatus>("BLOCKED");
@@ -18,11 +19,12 @@ export function Accounts() {
   const [error, setError] = useState<string | null>(null);
 
   const accounts = useQuery({
-    queryKey: ["accounts", role, status, q],
+    queryKey: ["accounts", role, status, verification, q],
     queryFn: () => {
       const p = new URLSearchParams();
       if (role) p.set("role", role);
       if (status) p.set("status", status);
+      if (verification) p.set("verification", verification);
       if (q.trim()) p.set("q", q.trim());
       return api<AccountRow[]>(`/admin/users${p.toString() ? `?${p}` : ""}`);
     },
@@ -81,6 +83,13 @@ export function Accounts() {
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>
           <option value="BLOCKED">Blocked</option>
+        </select>
+        <select style={{ width: 170 }} value={verification} onChange={(e) => setVerification(e.target.value)}>
+          <option value="">Any verification</option>
+          <option value="UNVERIFIED">Unverified</option>
+          <option value="PENDING">Pending</option>
+          <option value="VERIFIED">Verified</option>
+          <option value="REJECTED">Rejected</option>
         </select>
       </div>
 

@@ -12,6 +12,7 @@ export const moderationRouter = Router();
 const listQuery = z.object({
   role: z.enum(["BUYER", "FARMER", "DRIVER", "STAFF", "ADMIN"]).optional(),
   status: z.enum(["ACTIVE", "SUSPENDED", "BLOCKED"]).optional(),
+  verification: z.enum(["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"]).optional(),
   q: z.string().trim().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -21,12 +22,13 @@ moderationRouter.get(
   "/users",
   asyncHandler(async (req, res) => {
     await requireStaff(req);
-    const { role, status, q, limit } = listQuery.parse(req.query);
+    const { role, status, verification, q, limit } = listQuery.parse(req.query);
 
     const users = await prisma.user.findMany({
       where: {
         ...(role ? { role } : {}),
         ...(status ? { status } : {}),
+        ...(verification ? { verification } : {}),
         ...(q
           ? {
               OR: [

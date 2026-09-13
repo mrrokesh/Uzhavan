@@ -156,6 +156,17 @@ const run = async () => {
   const twice = await call(`/verification/queue/${kyc.id}`, { method: "POST", token: staff, body: { decision: "VERIFIED" } });
   ok("cannot review the same account twice", twice.status === 409);
 
+  const verifiedOnly = await call("/admin/users?verification=VERIFIED", { token: staff });
+  ok(
+    "the accounts list can be filtered to verified only",
+    (verifiedOnly.data ?? []).some((u) => u.id === kyc.id),
+  );
+  const unverifiedOnly = await call("/admin/users?verification=UNVERIFIED", { token: staff });
+  ok(
+    "and filtering to unverified excludes the one just approved",
+    !(unverifiedOnly.data ?? []).some((u) => u.id === kyc.id),
+  );
+
   section("10. Account blocking");
   const users = await call("/admin/users?role=DRIVER", { token: staff });
   ok("staff can list accounts", Array.isArray(users.data) && users.data.length >= 1);
