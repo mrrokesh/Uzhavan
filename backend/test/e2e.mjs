@@ -147,6 +147,34 @@ const run = async () => {
   });
   ok("duplicate open request blocked", dupe.status === 409, dupe.data?.error);
 
+  section("5b. Buyer edits the quantity on their own request");
+  // "Edit" used to be wired to this same create route, which is exactly what
+  // just got refused above — there was no edit path at all, client or server.
+  const editTooSmall = await call(`/requests/${requestId}`, {
+    method: "PATCH", token: buyer, body: { quantityKg: 100 },
+  });
+  ok("edit below minimum order rejected", editTooSmall.status === 400, editTooSmall.data?.error);
+
+  const editTooBig = await call(`/requests/${requestId}`, {
+    method: "PATCH", token: buyer, body: { quantityKg: 99999 },
+  });
+  ok("edit above availability rejected", editTooBig.status === 400, editTooBig.data?.error);
+
+  const wrongRole = await call(`/requests/${requestId}`, {
+    method: "PATCH", token: farmer, body: { quantityKg: 1500 },
+  });
+  ok("a farmer cannot edit a buyer's request", wrongRole.status === 403, wrongRole.data?.error);
+
+  const edited = await call(`/requests/${requestId}`, {
+    method: "PATCH", token: buyer, body: { quantityKg: 1500 },
+  });
+  ok("edit succeeds while pending", edited.status === 200, `${edited.data?.quantityKg} kg`);
+  ok("quantity actually changed", edited.data?.quantityKg === 1500);
+  ok("estimatedValue recomputed at the crop's listed price", edited.data?.estimatedValue === 1500 * 60);
+
+  // Restore, so the rest of the suite sees the quantity it expects.
+  await call(`/requests/${requestId}`, { method: "PATCH", token: buyer, body: { quantityKg: 2000 } });
+
   section("6. Buyer cannot self-approve (the old demo shortcut)");
   const selfAccept = await call(`/farmer/requests/${requestId}/accept`, {
     method: "POST", token: buyer, body: {},
@@ -170,6 +198,15 @@ const run = async () => {
     method: "POST", token: farmer, body: { finalPricePerKg: 65 },
   });
   ok("farmer accepts with a final price", accepted.status === 200, `₹${accepted.data?.finalPricePerKg}/kg`);
+
+  const editAfterAccept = await call(`/requests/${requestId}`, {
+    method: "PATCH", token: buyer, body: { quantityKg: 1800 },
+  });
+  ok(
+    "editing is refused once the farmer has priced it",
+    editAfterAccept.status === 409,
+    editAfterAccept.data?.error,
+  );
 
   section("8. Buyer confirms → order created, stock reserved");
   const order = await call(`/requests/${requestId}/confirm`, { method: "POST", token: buyer });

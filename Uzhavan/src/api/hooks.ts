@@ -185,6 +185,20 @@ export function useCreateRequest() {
   });
 }
 
+/** Change the quantity on a request still waiting on the farmer. */
+export function useUpdateRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, quantityKg }: { id: string; quantityKg: number }) =>
+      api<ApiRequest>(`/requests/${id}`, { method: "PATCH", body: { quantityKg } }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: keys.requests });
+      qc.invalidateQueries({ queryKey: keys.request(id) });
+      qc.invalidateQueries({ queryKey: ["crops"] });
+    },
+  });
+}
+
 export function useConfirmRequest() {
   const qc = useQueryClient();
   return useMutation({

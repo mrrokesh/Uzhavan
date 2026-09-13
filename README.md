@@ -435,7 +435,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 
 ## Testing
 
-The API is covered by eleven end-to-end suites — **452 assertions** — run against a live server and a real database:
+The API is covered by eleven end-to-end suites — **459 assertions** — run against a live server and a real database:
 
 ```bash
 cd backend
@@ -446,7 +446,7 @@ npm test             # in another
 
 | Suite | Covers |
 | --- | --- |
-| `e2e` (44) | The full loop, role enforcement, stock reservation, truck capacity, driver trip steps |
+| `e2e` (51) | The full loop, role enforcement, stock reservation, truck capacity, driver trip steps, request edits |
 | `sec` (47) | Peppered hashing, encryption at rest, KYC, document access, blocking, live revocation |
 | `admin` (63) | Permissions, non-delegable rights, tickets, escalation, remote config, update gating, audit |
 | `phase` (45) | District distance, filters, demand board, announcements, payments, vehicle tracking |

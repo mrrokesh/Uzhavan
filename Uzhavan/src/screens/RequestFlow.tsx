@@ -7,7 +7,7 @@ import { AppHeader, Screen } from "../components/Chrome";
 import { SuccessMark } from "../components/Logo";
 import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
 import { CropSummary, Stepper, Tracker } from "../components/Widgets";
-import { useCrop, useCreateRequest, useRequest, useRequestAction } from "../api/hooks";
+import { useCrop, useCreateRequest, useRequest, useRequestAction, useUpdateRequest } from "../api/hooks";
 import { REQUEST_LABEL } from "../api/types";
 import { imageFor } from "../lib/images";
 import { ApiError } from "../lib/api";
@@ -16,41 +16,50 @@ import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
 
 export function SelectQuantity() {
-  const { id } = useRoute<RouteProp<RootStackParamList, "SelectQuantity">>().params;
+  const { id, editingRequestId } = useRoute<RouteProp<RootStackParamList, "SelectQuantity">>().params;
   const crop = useCrop(id).data;
+  // Only fetched when editing, so the field can start at what was already
+  // requested rather than snapping back to the minimum order.
+  const editing = useRequest(editingRequestId);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [quantity, setQuantity] = useState<number | null>(null);
 
-  if (!crop) {
+  if (!crop || (editingRequestId && editing.isLoading)) {
     return (
       <Screen>
-        <AppHeader title="Select quantity" />
+        <AppHeader title={editingRequestId ? "Edit quantity" : "Select quantity"} />
         <ActivityIndicator color={colors.forest} style={{ marginTop: 48 }} />
       </Screen>
     );
   }
 
-  const qty = quantity ?? Math.min(crop.minOrderKg, crop.availableKg);
-  const share = pct(qty, crop.availableKg);
+  // Editing a request doesn't reserve anything until it's confirmed, so the
+  // crop's own free stock is the honest ceiling — same rule the server checks.
+  const editCeiling = editingRequestId ? crop.availableKg + (editing.data?.quantityKg ?? 0) : crop.availableKg;
+  const qty =
+    quantity ?? (editingRequestId ? (editing.data?.quantityKg ?? crop.minOrderKg) : Math.min(crop.minOrderKg, crop.availableKg));
+  const share = pct(qty, editCeiling);
   const value = qty * crop.pricePerKg;
   const presets = [crop.minOrderKg, crop.minOrderKg * 2, crop.minOrderKg * 4].filter(
-    (p) => p <= crop.availableKg,
+    (p) => p <= editCeiling,
   );
 
   return (
     <Screen
       footer={
         <PrimaryButton
-          label="Review request"
-          onPress={() => navigation.navigate("ReviewRequest", { id: crop.id, quantityKg: qty })}
+          label={editingRequestId ? "Review change" : "Review request"}
+          onPress={() =>
+            navigation.navigate("ReviewRequest", { id: crop.id, quantityKg: qty, editingRequestId })
+          }
         />
       }
     >
-      <AppHeader title="Select quantity" />
+      <AppHeader title={editingRequestId ? "Edit quantity" : "Select quantity"} />
       <ScrollView contentContainerStyle={styles.pad}>
         <CropSummary crop={crop} />
         <View style={styles.avail}>
-          <Text style={styles.muted}>📦 {kg(crop.availableKg)} available</Text>
+          <Text style={styles.muted}>📦 {kg(editCeiling)} available</Text>
           <Text style={styles.muted}>Minimum order {kg(crop.minOrderKg)}</Text>
         </View>
 
@@ -58,7 +67,7 @@ export function SelectQuantity() {
           <Stepper
             value={qty}
             onDec={() => setQuantity(Math.max(crop.minOrderKg, qty - 100))}
-            onInc={() => setQuantity(Math.min(crop.availableKg, qty + 100))}
+            onInc={() => setQuantity(Math.min(editCeiling, qty + 100))}
           />
           <View style={styles.picks}>
             {presets.map((p) => (
@@ -83,10 +92,12 @@ export function SelectQuantity() {
 }
 
 export function ReviewRequest() {
-  const { id, quantityKg } = useRoute<RouteProp<RootStackParamList, "ReviewRequest">>().params;
+  const { id, quantityKg, editingRequestId } =
+    useRoute<RouteProp<RootStackParamList, "ReviewRequest">>().params;
   const crop = useCrop(id).data;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const create = useCreateRequest();
+  const update = useUpdateRequest();
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -103,10 +114,21 @@ export function ReviewRequest() {
     setSending(true);
     setError(null);
     try {
-      const request = await create.mutateAsync({ cropId: crop.id, quantityKg });
-      navigation.replace("RequestSent", { requestId: request.id });
+      if (editingRequestId) {
+        await update.mutateAsync({ id: editingRequestId, quantityKg });
+        navigation.replace("RequestDetails", { requestId: editingRequestId });
+      } else {
+        const request = await create.mutateAsync({ cropId: crop.id, quantityKg });
+        navigation.replace("RequestSent", { requestId: request.id });
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn’t send your request.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : editingRequestId
+            ? "Couldn’t save the change."
+            : "Couldn’t send your request.",
+      );
     } finally {
       setSending(false);
     }
@@ -116,12 +138,17 @@ export function ReviewRequest() {
     <Screen
       footer={
         <>
-          <PrimaryButton label="Send request to farmer" onPress={send} loading={sending} disabled={sending} />
+          <PrimaryButton
+            label={editingRequestId ? "Save new quantity" : "Send request to farmer"}
+            onPress={send}
+            loading={sending}
+            disabled={sending}
+          />
           {error ? <Text style={styles.danger}>{error}</Text> : null}
         </>
       }
     >
-      <AppHeader title="Review request" />
+      <AppHeader title={editingRequestId ? "Confirm change" : "Review request"} />
       <ScrollView contentContainerStyle={styles.pad}>
         <CropSummary crop={crop} />
         <View style={styles.list}>
@@ -345,7 +372,10 @@ export function RequestDetails() {
               <OutlineButton
                 label="Edit request"
                 icon="pencil-outline"
-                onPress={() => crop && navigation.navigate("SelectQuantity", { id: crop.id })}
+                onPress={() =>
+                  crop &&
+                  navigation.navigate("SelectQuantity", { id: crop.id, editingRequestId: request.id })
+                }
               />
               <OutlineButton
                 label={working ? "Cancelling…" : "Cancel request"}

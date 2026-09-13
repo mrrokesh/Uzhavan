@@ -24,8 +24,9 @@ export type RootStackParamList = SharedScreens & {
   Tabs: undefined;
   CropDetail: { id: string };
   FarmerProfile: { farmId: string; cropId: string };
-  SelectQuantity: { id: string };
-  ReviewRequest: { id: string; quantityKg: number };
+  /** editingRequestId set means this is changing an existing pending request, not creating one. */
+  SelectQuantity: { id: string; editingRequestId?: string };
+  ReviewRequest: { id: string; quantityKg: number; editingRequestId?: string };
   RequestSent: { requestId: string };
   RequestDetails: { requestId: string };
   ConfirmPurchase: { requestId: string };

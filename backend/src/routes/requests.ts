@@ -95,6 +95,63 @@ requestsRouter.post(
   }),
 );
 
+const editBody = z.object({
+  quantityKg: z.coerce.number().int().positive(),
+});
+
+/**
+ * Change the quantity on a request that's still waiting on the farmer.
+ *
+ * Restricted to PENDING on purpose. Once the farmer has priced it, they priced
+ * *that* quantity — silently changing it under them isn't an edit, it's a new
+ * negotiation wearing the old one's code. A buyer who wants a different amount
+ * after acceptance declines and requests again, same as changing their mind
+ * about the price would require.
+ *
+ * "Edit" was previously wired to the create flow, which correctly refused with
+ * a duplicate-request error — there was no edit path at all, client or server.
+ */
+requestsRouter.patch(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const buyer = await requireRole(req, "BUYER");
+    const { quantityKg } = editBody.parse(req.body);
+
+    const request = await prisma.cropRequest.findUnique({
+      where: { id: String(req.params.id) },
+      include: { crop: true },
+    });
+    if (!request || request.buyerId !== buyer.id) throw new HttpError(404, "Request not found");
+    if (request.status !== "PENDING") {
+      throw new HttpError(
+        409,
+        request.status === "FARMER_ACCEPTED"
+          ? "The farmer has already priced this request — decline it and request again to change the quantity"
+          : "This request is no longer open",
+      );
+    }
+
+    const crop = request.crop;
+    if (!crop.listed) throw new HttpError(404, "This crop is no longer listed");
+    if (quantityKg < crop.minOrderKg) {
+      throw new HttpError(400, `Minimum order is ${crop.minOrderKg} kg`);
+    }
+    // This request hasn't reserved anything yet — only CONFIRMED ones have —
+    // so the ceiling is the crop's free stock, same check as creating one.
+    const available = crop.expectedKg - crop.reservedKg;
+    if (quantityKg > available) {
+      throw new HttpError(400, `Only ${available} kg is still available`);
+    }
+
+    const updated = await prisma.cropRequest.update({
+      where: { id: request.id },
+      data: { quantityKg, estimatedValue: quantityKg * crop.pricePerKg },
+      include: withRelations,
+    });
+    res.json(withQuote(updated, await platformFeeBps()));
+  }),
+);
+
 /** Buyer accepts the farmer's final price — this is what creates the order. */
 requestsRouter.post(
   "/:id/confirm",
