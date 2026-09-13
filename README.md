@@ -528,7 +528,7 @@ If the database is shared with other applications, keep `connection_limit` in `D
 
 - **Uzhavan Plus in the app.** The subscription works server-side; there's no screen to buy it.
 - **A real Razorpay account.** No gateway is configured, so checkout, Route linked accounts and transfers have only ever been exercised against their refusal paths. The suites assert the scheduling and the clean 503 — not a completed payment.
-- **Deployment is in progress, not finished.** The console is going up on Vercel and the API on Render; as of writing they haven't been pointed at each other yet (`VITE_API_URL` / `CORS_ORIGIN`, above), so a login attempt against the live console 404s.
+- **Deployment is in progress, not finished.** The console is going up on Vercel and the API on Render; as of writing they haven't been confirmed pointed at each other yet (`VITE_API_URL` / `CORS_ORIGIN`, above). A first deploy attempt also hit an unrelated wall — Vercel's Hobby plan blocks a deploy outright when the triggering commit's author isn't a member of the Vercel team, and has no way to add one for a private repo short of upgrading. The repo was made public to get past that, which is a real tradeoff (the source, including the business rules above, is now visible to anyone) and worth knowing if you're deciding how to host your own fork.
 - **Hardware verification is partial.** Both mobile apps launch on a physical device post-reorg, and each shows its own correct name and branding — that much is confirmed, not assumed. A full walkthrough of sign-in, checkout and the newer screens (payouts, reviews, suggestions) hasn't been re-run since the split into independent `Uzhavan/` / `Uzhavanbuy/` projects.
 
 ### Known operational issue
