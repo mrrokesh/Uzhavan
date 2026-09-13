@@ -1,0 +1,106 @@
+# Render Blueprint — the API and the admin console.
+#
+# Deploy with this rather than by clicking: the settings are then reviewable in
+# a diff, and a second environment is a copy of a file rather than an afternoon
+# of remembering what was ticked.
+#
+#   Render dashboard → New → Blueprint → point it at this repo.
+#
+# Secrets are `sync: false`, which means Render prompts for them once and never
+# stores them here. Nothing in this file is confidential.
+#
+# The database is NOT defined here. It stays on the existing Ubuntu box, so
+# Render reaches it over the public internet — see the notes in DEPLOY.md about
+# latency and sslmode, both of which matter more than they sound.
+
+services:
+  - type: web
+    name: uzhavan-api
+    runtime: node
+    # Singapore is Render's closest region to Tamil Nadu. Every other region
+    # adds 150ms or more to every single database query.
+    region: singapore
+    plan: starter
+    rootDir: server
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # Postgres on the existing VPS. Include sslmode=require — without it the
+      # connection crosses the internet unencrypted, KYC documents included.
+      # Keep connection_limit low: that box hosts 43 databases.
+      - key: DATABASE_URL
+        sync: false
+
+      # Generate each with:
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      # PASSWORD_PEPPER and ENCRYPTION_KEY can never change once real data
+      # exists — a new pepper invalidates every password, a new encryption key
+      # makes every stored document permanently unreadable. Back them up
+      # somewhere that is not this server.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PASSWORD_PEPPER
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+
+      # The console's origin. The server refuses to boot in production with "*".
+      - key: CORS_ORIGIN
+        sync: false
+
+      # In production the server refuses to boot with both of these on "log",
+      # because a locked-out farmer would have no way back into their account.
+      # Set at least one for real.
+      - key: EMAIL_DRIVER
+        value: smtp
+      - key: SMTP_URL
+        sync: false
+      - key: EMAIL_FROM
+        value: Uzhavan <no-reply@uzhavan.app>
+      - key: SMS_DRIVER
+        value: log
+      - key: MSG91_AUTH_KEY
+        sync: false
+      - key: MSG91_SENDER_ID
+        value: UZHAVN
+
+      - key: SUPPORT_EMAIL
+        value: support@uzhavan.app
+      - key: TICKET_ESCALATION_HOURS
+        value: "24"
+      - key: RESET_CODE_MINUTES
+        value: "15"
+
+  - type: web
+    name: uzhavan-admin
+    runtime: static
+    rootDir: admin
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Absolute, because a static host can't proxy /api to another service.
+      # Whatever is set here must also appear in the API's CORS_ORIGIN.
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # A single-page app: every unknown path is the app's own router, not a
+      # missing file.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: same-origin

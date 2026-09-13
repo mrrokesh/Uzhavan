@@ -1,0 +1,15 @@
+{
+  // Build only the server. The base config also typechecks prisma/*.ts, which
+  // pushes the inferred rootDir up to the project root and nests the output as
+  // dist/src/index.js — so `node dist/index.js` finds nothing and production
+  // dies on boot. Pinning rootDir here keeps the emitted tree flat.
+  //
+  // The seed and reset scripts are deliberately not compiled: they are run with
+  // tsx, never from dist.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"]
+}

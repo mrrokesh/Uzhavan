@@ -125,12 +125,14 @@ const run = async () => {
 
   console.log("\nFlood protection");
 
-  // /forgot costs an SMS and an email each time.
+  // A different account from the one password.mjs uses: the per-target limit
+  // lasts fifteen minutes, so sharing one would make the two suites fight
+  // whenever they run twice in quick succession.
   let limited = 0;
   for (let i = 0; i < 14; i += 1) {
     const r = await call("/auth/password/forgot", {
       method: "POST",
-      body: { email: "kannan@uzhavan.app" },
+      body: { email: "muthu@uzhavan.app" },
     });
     if (r.status === 429) limited += 1;
   }
@@ -138,7 +140,7 @@ const run = async () => {
 
   const throttled = await call("/auth/password/forgot", {
     method: "POST",
-    body: { email: "kannan@uzhavan.app" },
+    body: { email: "muthu@uzhavan.app" },
   });
   ok("with a 429 and a wait time", throttled.status === 429 && /try again in/i.test(throttled.data?.error ?? ""),
     JSON.stringify(throttled.data));

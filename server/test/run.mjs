@@ -49,6 +49,36 @@ const run = (name) =>
     child.on("close", (code) => resolve({ code, out }));
   });
 
+/**
+ * Remove fixtures a previous run left behind.
+ *
+ * Suites delete what they create, but only on the happy path — a crash or a
+ * Ctrl-C leaves rows there, and reserving crop quantity is permanent. Enough of
+ * those and later runs fail on debris rather than on a bug, which is worse than
+ * failing loudly: it looks like a regression.
+ */
+async function cleanFixtures() {
+  const { PrismaClient } = await import("@prisma/client");
+  const prisma = new PrismaClient();
+  const titles = { OR: [{ title: { startsWith: "Suite crop" } }, { title: { startsWith: "Review fixture" } }, { title: { startsWith: "Suggest " } }] };
+  const crops = await prisma.crop.findMany({ where: titles, select: { id: true } });
+  const ids = crops.map((c) => c.id);
+  if (ids.length) {
+    await prisma.review.deleteMany({ where: { order: { cropId: { in: ids } } } });
+    await prisma.payout.deleteMany({ where: { order: { cropId: { in: ids } } } });
+    await prisma.truckBooking.deleteMany({ where: { order: { cropId: { in: ids } } } });
+    await prisma.order.deleteMany({ where: { cropId: { in: ids } } });
+    await prisma.cropRequest.deleteMany({ where: { cropId: { in: ids } } });
+    await prisma.crop.deleteMany({ where: { id: { in: ids } } });
+    console.log(`swept ${ids.length} leftover fixture listing${ids.length === 1 ? "" : "s"}
+`);
+  }
+  await prisma.paymentGateway.deleteMany({ where: { label: { startsWith: "Suite account" } } });
+  await prisma.$disconnect();
+}
+
+await cleanFixtures();
+
 let failed = 0;
 let total = 0;
 

@@ -447,13 +447,32 @@ npx expo-doctor                # dependency + config health
 
 ---
 
+## Deploying
+
+[`render.yaml`](render.yaml) is a Render Blueprint defining both hosted pieces — the API as a Node web service and the console as a static site. [`DEPLOY.md`](DEPLOY.md) has the full walkthrough, including the per-database Postgres role, the TLS settings, and the environment variables Render prompts for.
+
+The database is **not** in the blueprint. It stays on the existing Ubuntu box, and that single decision drives most of what the guide has to say:
+
+- **Render's nearest region to Tamil Nadu is Singapore**, so every query pays 50–80 ms of round trip. Prisma issues several per request, so a screen wanting five spends about a third of a second waiting. Deploying the API onto the same machine as Postgres makes that 0.1 ms. Splitting them is a real cost, not a detail.
+- **Port 5432 has to stay open to the internet**, because Render's outbound addresses aren't fixed. Give Uzhavan its own limited Postgres role first — the `postgres` superuser currently unlocks all 43 databases on that box *and* grants shell through `COPY ... FROM PROGRAM`.
+- **Render's free plan sleeps** after fifteen minutes, and the next request waits about fifty seconds. Fine for a demo, not for someone standing in a field.
+
+Two things the build needed before it could deploy at all, both fixed:
+
+- The admin console called `/api` same-origin and relied on Vite's dev proxy, so on any static host every call would have 404'd. It now takes an absolute `VITE_API_URL` when it can't be proxied, and stays same-origin when it can.
+- `npm run build` emitted to `dist/src/index.js` while `npm start` looked for `dist/index.js`, because the typecheck config also covers `prisma/*.ts` and that pushes the inferred root up a level. Production would have died on boot with "cannot find module". There's now a separate build config that pins `rootDir`, and typechecking still covers the seed scripts.
+
+---
+
 ## Maintenance
 
 ```bash
 cd server
-npm run db:reset     # clear trips/orders/requests, release reservations, re-seed
+npm run db:reset     # back to a freshly-seeded state
 npm run db:studio    # browse the database
 ```
+
+`db:reset` clears more than it sounds like it should, on purpose. A KYC decision, a failed-login lockout, a rating, a payout schedule and a push token all survive an ordinary "delete the orders" reset, and each one changes how the app behaves next time. A driver left `PENDING` makes a verification test fail with "already under review" — which reads like a regression and isn't one.
 
 Back up before any destructive migration:
 

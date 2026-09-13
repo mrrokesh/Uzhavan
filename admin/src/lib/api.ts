@@ -31,10 +31,23 @@ type Options = {
   body?: unknown;
 };
 
-/** Vite proxies /api to the server in dev, so this is same-origin either way. */
+/**
+ * Where the API lives.
+ *
+ * Empty by default, which makes every call same-origin: Vite proxies /api in
+ * dev, and behind a reverse proxy in production the console and the API share
+ * a host. Same-origin is the better shape — no CORS to configure and no bearer
+ * token crossing origins.
+ *
+ * Set VITE_API_URL at build time when the console is hosted somewhere that
+ * can't proxy, such as a static host on a different domain. Then the API needs
+ * CORS_ORIGIN set to this console's origin.
+ */
+const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+
 export async function api<T>(path: string, options: Options = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${BASE}/api${path}`, {
     method: options.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
@@ -69,7 +82,7 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
  * them directly — pull the bytes and hand back an object URL instead.
  */
 export async function fetchDocument(id: string): Promise<{ url: string; type: string }> {
-  const res = await fetch(`/api/verification/documents/${id}`, {
+  const res = await fetch(`${BASE}/api/verification/documents/${id}`, {
     headers: { Authorization: `Bearer ${getToken() ?? ""}` },
   });
   if (!res.ok) throw new ApiError(res.status, "Couldn't load that document");
