@@ -1,0 +1,25 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "uzhavan": {
+      "channel": "uzhavan",
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "uzhavan-preview": {
+      "extends": "uzhavan",
+      "distribution": "internal",
+      "channel": "uzhavan-preview",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "uzhavan": {}
+  }
+}

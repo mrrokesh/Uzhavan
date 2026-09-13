@@ -21,7 +21,7 @@ services:
     # adds 150ms or more to every single database query.
     region: singapore
     plan: starter
-    rootDir: server
+    rootDir: backend
     buildCommand: npm ci && npx prisma generate && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
@@ -80,7 +80,7 @@ services:
   - type: web
     name: uzhavan-admin
     runtime: static
-    rootDir: admin
+    rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:

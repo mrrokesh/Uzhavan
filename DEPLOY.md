@@ -92,7 +92,7 @@ Render will prompt for every variable marked `sync: false`.
 | `SMTP_URL` | your mail provider's SMTP URL |
 | `VITE_API_URL` | the API's URL, e.g. `https://uzhavan-api.onrender.com` |
 
-The host is deliberately not written down here. It's in `server/.env`, and a
+The host is deliberately not written down here. It's in `backend/.env`, and a
 repository is a poor place to record where an internet-facing database lives.
 
 Generate the two secrets with:
@@ -101,7 +101,7 @@ Generate the two secrets with:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-**Use the values already in `server/.env` if this database has real data in
+**Use the values already in `backend/.env` if this database has real data in
 it.** A different `PASSWORD_PEPPER` invalidates every existing password; a
 different `ENCRYPTION_KEY` makes every stored KYC document permanently
 unreadable. Back both up somewhere that is not this server.

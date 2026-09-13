@@ -2,7 +2,7 @@
 
 A three-sided farm-to-buyer marketplace for Tamil Nadu. Farmers list a harvest, wholesale buyers request a quantity and confirm the price the farmer sets, and local truck drivers move the crop from farm to warehouse. No middlemen.
 
-**Two apps**, built from one codebase, backed by a Node/Postgres API and a web console for admin and support staff.
+**Two apps** — independent projects sharing the same design and API contract — backed by a Node/Postgres API and a web console for admin and support staff.
 
 | App | For | Package |
 | --- | --- | --- |
@@ -10,6 +10,15 @@ A three-sided farm-to-buyer marketplace for Tamil Nadu. Farmers list a harvest, 
 | **Uzhavan Buy** | Wholesale dealers and buyers | `com.uzhavan.buy` |
 
 Farmers and drivers share one app deliberately: they're often the same household, and one login that can both list a harvest and accept a haul beats two installs. A buyer wants a completely different home screen, which is the split that earns its keep.
+
+## Repo layout
+
+| Folder | What it is |
+| --- | --- |
+| [`Uzhavan/`](Uzhavan) | The farmer/driver mobile app (Expo/React Native) |
+| [`Uzhavanbuy/`](Uzhavanbuy) | The buyer mobile app (Expo/React Native) — an independent project, not a build target of `Uzhavan/` |
+| [`backend/`](backend) | The Node/Express/Prisma API both apps and the console talk to |
+| [`frontend/`](frontend) | The web console (Vite/React) for admin and support staff |
 
 **Repo:** [github.com/mrrokesh/Uzhavan](https://github.com/mrrokesh/Uzhavan)
 
@@ -33,12 +42,12 @@ Sign into the wrong app and you're told which one you want, rather than shown a 
 
 ## Run
 
-Three parts. Start the API first; the other two talk to it.
+Four parts. Start the API first; the rest talk to it.
 
-### 1. API (`server/`)
+### 1. API (`backend/`)
 
 ```bash
-cd server
+cd backend
 npm install
 cp .env.example .env      # fill in DATABASE_URL and generate the secrets
 npm run db:push           # create the tables
@@ -50,27 +59,35 @@ npm run dev               # http://localhost:4000
 
 Every secret in `.env.example` is documented inline, including how to generate one. The server refuses to boot on a malformed key, and refuses to run in production with `CORS_ORIGIN=*`.
 
-### 2. Admin console (`admin/`)
+### 2. Admin console (`frontend/`)
 
 ```bash
-cd admin
+cd frontend
 npm install
 npm run dev               # http://localhost:5173
 ```
 
 Sign in with a staff or admin account. Vite proxies `/api` to the server, so there's no CORS to configure. `npm run build` produces a static bundle (~78 KB gzipped).
 
-### 3. Mobile app (repo root)
+### 3. Farmer/driver app (`Uzhavan/`)
 
 ```bash
+cd Uzhavan
 npm install
-npm start            # Uzhavan       — farmers and drivers, port 8082
-npm run start:buy    # Uzhavan Buy   — buyers, port 8083
+npm start            # port 8082
 ```
 
-Scan the QR with **Expo Go**, or press `a` / `i` for an emulator. Requires Node 22+. Both can run at once, on different ports.
+### 4. Buyer app (`Uzhavanbuy/`)
 
-Which app a build is comes from `UZHAVAN_APP` in [`app.config.js`](app.config.js), which stamps the name, slug, bundle id and `extra.appKind`. Everything the two share stays in `app.json`, and [`eas.json`](eas.json) carries a store and an internal-APK profile for each.
+```bash
+cd Uzhavanbuy
+npm install
+npm start            # port 8083
+```
+
+Scan the QR with **Expo Go**, or press `a` / `i` for an emulator. Requires Node 22+. Both apps can run at once, on their own ports — they're independent Expo projects now, not two build targets of one codebase, so each gets its own `npm install`.
+
+Each app's identity (name, scheme, bundle id, `extra.appKind`) is hardcoded in its own `app.config.js`. The two still share one EAS project (slug + updates URL, in each app's `app.json`) deliberately — one dashboard, one set of credentials — and [`eas.json`](Uzhavan/eas.json) in each folder carries that app's own store and internal-APK profile.
 
 The app finds the API at `http://<your-machine's-LAN-IP>:4000`, derived from the Expo dev-server host, so a phone on the same Wi-Fi just works. Override with `EXPO_PUBLIC_API_URL` when pointing at a deployed API.
 
@@ -98,7 +115,7 @@ Every seeded account uses the password **`uzhavan123`**.
 | Admin | `admin@uzhavan.app` — console only |
 | Staff | `staff@uzhavan.app` — console only |
 
-Set `ADMIN_PASSWORD` in `server/.env` before going live and the seed uses that for the admin instead.
+Set `ADMIN_PASSWORD` in `backend/.env` before going live and the seed uses that for the admin instead.
 
 ---
 
@@ -399,8 +416,8 @@ Indian rupee formatting (`₹1,90,000`), weights in kg. Status colour is consist
 ## Stack
 
 - **Mobile:** Expo 57, React Native 0.86, React Navigation 7, TanStack Query, TypeScript
-- **API:** Node 22, Express 5, Prisma 6, Zod, JWT, bcrypt — see [`server/`](server)
-- **Console:** React 18, Vite 6, TanStack Query, plain CSS — see [`admin/`](admin)
+- **API:** Node 22, Express 5, Prisma 6, Zod, JWT, bcrypt — see [`backend/`](backend)
+- **Console:** React 18, Vite 6, TanStack Query, plain CSS — see [`frontend/`](frontend)
 - **Database:** PostgreSQL
 
 Images stay bundled in the app; the API returns image *keys* that resolve to local assets via `src/lib/images.ts`.
@@ -412,7 +429,7 @@ Images stay bundled in the app; the API returns image *keys* that resolve to loc
 The API is covered by eleven end-to-end suites — **452 assertions** — run against a live server and a real database:
 
 ```bash
-cd server
+cd backend
 npm run dev          # in one terminal
 npm run db:reset     # start from a known state
 npm test             # in another
@@ -439,10 +456,10 @@ A 503 is retried rather than failed. The API returns it to mean "busy, try again
 Typecheck everything:
 
 ```bash
-npx tsc --noEmit               # mobile app
-cd server && npm run typecheck
-cd admin && npm run typecheck
-npx expo-doctor                # dependency + config health
+cd Uzhavan && npx tsc --noEmit && npx expo-doctor
+cd Uzhavanbuy && npx tsc --noEmit && npx expo-doctor
+cd backend && npm run typecheck
+cd frontend && npm run typecheck
 ```
 
 ---
@@ -467,7 +484,7 @@ Two things the build needed before it could deploy at all, both fixed:
 ## Maintenance
 
 ```bash
-cd server
+cd backend
 npm run db:reset     # back to a freshly-seeded state
 npm run db:studio    # browse the database
 ```
