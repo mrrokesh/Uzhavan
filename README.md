@@ -244,7 +244,7 @@ Four are **admin-only and structurally non-delegable** — create/remove staff, 
 | **Overview** | Pending verifications, unassigned tickets, blocked accounts, GMV |
 | **Verification** | Review queue with the decrypted identifier beside the decrypted document |
 | **Support** | Ticket desk — assign, reply, internal notes, status |
-| **Accounts** | Search, then suspend / block / restore with a reason the user sees |
+| **Accounts** | Search, filter by role and by state (active / suspended / blocked, or unverified / pending / verified / rejected, in one dropdown), then suspend / block / restore with a reason the user sees |
 | **Announcements** | Broadcast to farmers, buyers, drivers or everyone; drafts, pinning, expiry |
 | **Settings** | Support phone, email, WhatsApp, hours — read live by the apps |
 | **Track a vehicle** | Plate lookup — driver, papers, lapsed insurance, and what's on board now |
