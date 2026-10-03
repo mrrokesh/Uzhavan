@@ -10,46 +10,58 @@ Use your email and password. If you forget the password, tap **Forgot password**
 
 On **Home** you can:
 
-- Filter by distance, price, category, or verified farms only.
-- Sort by newest, nearest, or price.
-- Use the **Picked for you** row. Each card says why it was chosen.
+- Filter by distance, price band, category, or verified farms only.
+- Sort by **Newest**, **Nearest**, **Price: low** or **Price: high**.
+- Look at the strip above the feed. It reads **Picked for you** once the app knows what you buy, or **Worth a look** until then. Each card says why it was chosen.
 
-Tap a crop to open it. You will see the farmer, the quantity still available, and the minimum order.
+Tap a crop to open it. You will see the farmer, how much is still available, and the minimum order.
 
-## Ask a farmer a question first
+## Ask the farmer a question first
 
-On a crop page, tap **Message farmer**. This opens a chat with that farm. You can message before you request anything. See [Messages, notifications and the assistant](messages-notifications-assistant.md).
+On a crop page, tap **Message farmer**. A chat opens with that farm. You can message before you request anything. See [Messages, notifications and the assistant](messages-notifications-assistant.md).
 
-## Request a quantity
+## Send a request
 
-1. Tap **Select quantity** and choose how many kilograms.
-2. Review it and send the request.
-3. Wait for the farmer. The price shown is only an estimate until they answer.
+1. On the crop page, tap **Select quantity** and choose how many kilograms.
+2. Tap **Review request**, check it, then tap **Send request to farmer**.
+3. Tap **Track request** to follow it. The price is only an estimate until the farmer answers.
 
-The request screen updates by itself. You do not need to refresh.
+The request screen updates by itself. The status reads **Awaiting farmer**, then **Farmer accepted** or **Farmer declined**.
 
-**Changed your mind about the quantity?** Open the pending request and tap **Edit request**. You can edit while the farmer has not answered yet. After the farmer has set a price, decline and request again instead.
+**Changed your mind?**
+- While it says **Awaiting farmer**, open the request and tap **Edit request** to change the quantity, or **Cancel request** to withdraw it.
+- After the farmer has set a price, you cannot edit. Decline the offer and send a new request.
 
-## After the farmer accepts
+## When the farmer accepts
 
-You will get a notification. Open the request and tap confirm. This creates your order and reserves the crop for you.
+You get a notification. Open the request and you will see the farmer's final price.
 
-## Pay
+1. Tap **Confirm quantity**. This creates your order and reserves the crop for you. If you do not want it at that price, tap **Decline offer**.
+2. Tap **Continue to payment**.
+3. Tap **Pay ₹...** on the checkout screen. The platform fee is shown before you pay.
 
-Open the order from **My Orders** and go to checkout. Payment is held safely until the crop is delivered. The platform fee is shown before you pay.
+You will see **Payment received**. Your money is held safely until the crop is delivered.
+
+If you leave before paying, the order shows **Payment due** in **My Orders**. Tap it to pay.
 
 ## Book a truck
 
-On **Book Track**, choose your order, set the pickup and delivery details, and pick from the trucks that are online. Trucks that cannot carry your load stay in the list but are greyed out, with the reason shown. You can also use your own truck.
+After payment, tap **Book a truck**. You can also start from the **Book Track** tab and tap **Book truck**, then choose your order.
 
-## Track and finish
+1. Tap **Find nearby trucks**, check the pickup and delivery details, then tap **Choose truck**.
+2. Pick a truck and tap **Continue**. Trucks that cannot carry your load stay in the list but are greyed out, with the reason shown.
+3. Tap **Review booking**, then confirm and pay the fare.
 
-Watch each step live: driver accepted, reached the farm, loaded, on the way, delivered. At the end you get a delivery receipt with the name of the person who received the crop. Then you can rate the farm and the driver.
+Using your own truck? Tap **I'll use a private truck** instead.
+
+## Track the delivery
+
+Open the order from **My Orders**. The status moves through **Finding a driver**, **Driver assigned**, **Driver at the farm**, **Crop loaded**, **On the way**, and **Delivered**. When it is delivered, tap **View delivery receipt** to see who received the crop. You can then rate the farm and the driver.
 
 ## Get verified (free)
 
-In **Profile**, open **Verification** and submit your GSTIN or Udyam number with the certificate. Staff review it. A verified badge helps farmers trust you.
+In **Profile**, open **Verification**. Submit your GSTIN or Udyam number with the certificate. Staff review it, and you get a verified badge.
 
 ## Get help
 
-In **Profile**, tap **Help & support** to raise an issue, call, or message support. Tap **Ask a question** for quick answers about crops, delivery and payments.
+In **Profile**, tap **Help & support** to raise an issue, or call or message support. Tap **Ask a question** for quick answers about crops, delivery and payments.
