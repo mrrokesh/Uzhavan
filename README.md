@@ -477,6 +477,8 @@ npm run db:reset     # start from a known state
 npm test             # in another
 ```
 
+The suites share a database with the deployed API, so they sweep up after themselves: at the start and the end of a run they remove their own crops and the accounts they register. They leave the showcase data from `npm run db:demo` alone, though `db:reset` does clear its orders and requests, so load it again afterwards.
+
 | Suite | Covers |
 | --- | --- |
 | `e2e` (51) | The full loop, role enforcement, stock reservation, truck capacity, driver trip steps, request edits |
@@ -567,7 +569,7 @@ If the database is shared with other applications, keep `connection_limit` in `D
 
 - **Uzhavan Plus in the app.** The subscription works server-side; there's no screen to buy it.
 - **A real Razorpay account.** No gateway is configured, so checkout, Route linked accounts and transfers have only ever been exercised against their refusal paths. The suites assert the scheduling and the clean 503 — not a completed payment.
-- **Checkout, payouts, reviews and suggestions haven't been walked through on a physical device.** Sign-in, the home feed, crop browsing, farmer-buyer chat (both directions, both apps), the assistant, and editing a pending request are all confirmed working on hardware. The later-stage screens simply haven't come up in testing yet.
+- **Payment, payouts and push have never run end to end on a phone.** Both apps have been walked through on a physical Android device: the buyer app (home feed, notifications, chat, the assistant, My Orders, Book Track, Profile) and the farmer and driver app (home, requests, listings, demand board, bank-details screen, messages, trips, trip detail, profile). What is missing is anything that needs a payment gateway or a real build: checkout, paying out a farmer, and push alerts. The booking, accept and deliver steps are covered by the backend suites rather than by taps.
 
 The console is live on Vercel, the API on Render, and `VITE_API_URL` / `CORS_ORIGIN` are confirmed pointed at each other.
 
