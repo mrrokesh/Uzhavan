@@ -58,6 +58,19 @@ adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8083"
 
 Use 8082 instead of 8083 for the farmer/driver app. If you unplug the cable, run the `adb reverse` lines again.
 
+## Load the showcase data
+
+For a demo or a walkthrough, load a realistic marketplace on top of the seed:
+
+```bash
+cd backend
+npm run db:seed          # if the database is empty
+npm run db:demo          # add the showcase
+npm run db:demo -- --remove   # take it out again
+```
+
+It adds six crops and one deal at every stage: a request waiting, one priced by the farmer, one declined, an order awaiting a truck, a trip on the road, and a finished delivery with ratings. It also adds a chat and the matching notifications. Sign in as `karthik@uzhavan.app` to see the buyer side, or as `arul@`, `muthu@`, `kannan@` or `selvam@` for the others. Run it again after `db:reset` or a test run, because both clear orders and requests. Orders show "Payment due" because no payment gateway is configured.
+
 ## Run the tests
 
 The tests run against a live server and a real database.
@@ -71,6 +84,7 @@ npm test               # another terminal
 
 Things that trip people up:
 
+- **The suites clean up after themselves.** They remove their own crops and test accounts at the end of a run. They do not remove the showcase data, and `db:reset` does clear the showcase deals.
 - **Reset first.** Several suites change things that cannot be undone, so a second run without `db:reset` fails on its own leftovers.
 - **Do not run the suites many times in a row.** The server remembers password-reset and login attempts in memory for about 15 minutes. After many runs you get `429` errors and unrelated failures. Restart the API to clear it.
 - **The shared database is sometimes busy.** An error mentioning "out of shared memory" is a known problem with the database host. Run the step again.

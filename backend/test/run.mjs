@@ -63,7 +63,7 @@ const run = (name) =>
 async function cleanFixtures() {
   const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient();
-  const titles = { OR: [{ title: { startsWith: "Suite crop" } }, { title: { startsWith: "Review fixture" } }, { title: { startsWith: "Suggest " } }] };
+  const titles = { OR: [{ title: { startsWith: "Suite crop" } }, { title: { startsWith: "Review fixture" } }, { title: { startsWith: "Suggest " } }, { title: "Test Millet" }] };
   const crops = await prisma.crop.findMany({ where: titles, select: { id: true } });
   const ids = crops.map((c) => c.id);
   if (ids.length) {
@@ -77,6 +77,19 @@ async function cleanFixtures() {
 `);
   }
   await prisma.paymentGateway.deleteMany({ where: { label: { startsWith: "Suite account" } } });
+  // Accounts the suites register for themselves. The names are timestamped, so
+  // they can't be mistaken for the seeded demo accounts or a real signup.
+  await prisma.user.deleteMany({
+    where: { role: "BUYER", email: { startsWith: "test", endsWith: "@uzhavan.app" } },
+  });
+  for (const u of await prisma.user.findMany({
+    where: { role: "STAFF", email: { startsWith: "agent", endsWith: "@uzhavan.app" } },
+    select: { id: true },
+  })) {
+    // A staff account that has already acted leaves audit history behind, and
+    // the audit log is append-only on purpose — keep those rather than force it.
+    await prisma.user.delete({ where: { id: u.id } }).catch(() => {});
+  }
   await prisma.$disconnect();
 }
 
@@ -99,6 +112,10 @@ for (const [name, what] of SUITES) {
     console.log(`ok    ${name.padEnd(8)} ${String(passed).padStart(3)} assertions  ${what}`);
   }
 }
+
+// The database is shared with the deployed API, so what the suites leave behind
+// is what real users see in the feed. Sweep on the way out, not only on the way in.
+await cleanFixtures();
 
 console.log(`\n${total} assertions, ${failed} suite${failed === 1 ? "" : "s"} failing`);
 process.exit(failed ? 1 : 0);

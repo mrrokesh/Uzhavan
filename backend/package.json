@@ -19,7 +19,8 @@
     "db:reset": "tsx prisma/reset.ts && tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "test": "tsx test/run.mjs",
-    "set-password": "tsx prisma/set-password.ts"
+    "set-password": "tsx prisma/set-password.ts",
+    "db:demo": "node prisma/demo.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

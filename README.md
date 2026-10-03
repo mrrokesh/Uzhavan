@@ -545,8 +545,11 @@ Three things the build needed before it could deploy at all, all fixed:
 ```bash
 cd backend
 npm run db:reset     # back to a freshly-seeded state
+npm run db:demo      # load the showcase marketplace (add -- --remove to take it out)
 npm run db:studio    # browse the database
 ```
+
+`db:demo` fills the app for a walkthrough: six extra crops across the three farms, and one deal at every stage — a request waiting on the farmer, one the farmer has priced, one declined, a confirmed order, a trip on the road, and a finished delivery with ratings both ways — plus a buyer-to-farmer chat, notifications for each step, and all three drivers online. It goes through the real API, so fees, stock and notifications behave as they do for a real user, and it skips itself if already loaded. Run it **after** `db:reset` or a test run, because both clear orders and requests. The orders show *Payment due* because no payment gateway is configured, and faking a payment would put invented money in the demo.
 
 `db:reset` clears more than it sounds like it should, on purpose. A KYC decision, a failed-login lockout, a rating, a payout schedule and a push token all survive an ordinary "delete the orders" reset, and each one changes how the app behaves next time. A driver left `PENDING` makes a verification test fail with "already under review" — which reads like a regression and isn't one.
 
