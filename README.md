@@ -22,6 +22,8 @@ Farmers and drivers share one app deliberately: they're often the same household
 
 **Repo:** [github.com/mrrokesh/Uzhavan](https://github.com/mrrokesh/Uzhavan)
 
+**New here?** Start with the plain-language guides in [`docs/`](docs/README.md): one for buyers, farmers, drivers and admins, plus developer setup, a deployment hand-off, and troubleshooting. The rest of this README is the technical reference.
+
 ---
 
 ## The three sides
@@ -264,7 +266,7 @@ Two channels, each with a driver chosen by environment, and both defaulting to *
 | --- | --- |
 | Email | `log` · `smtp` (any SMTP URL) |
 | SMS | `log` · `msg91` |
-| Push | Expo, no configuration |
+| Push | Expo, with Firebase (FCM) credentials for Android — see [`docs/deployment-handoff.md`](docs/deployment-handoff.md) |
 
 **Push** goes through Expo, so there are no APNs certificates to rotate and no per-platform code. Publishing an announcement sends to everyone it targets, skipping suspended and blocked accounts — someone who can't use the app shouldn't be pinged about it. Editing an already-published notice doesn't buzz anyone a second time; only the draft-to-live transition does. Tokens Expo reports as dead are deleted rather than retried forever, and a handset that changes hands follows the new account.
 
@@ -288,7 +290,7 @@ Two feeds, one bell. **Announcements** are one row broadcast to many people — 
 
 Personal notifications ride the same push pipeline as announcements — write the row first, push is a courtesy on top — so the in-app list is always right even when Expo's service isn't reachable.
 
-**Push cannot be tested in Expo Go.** Since Expo SDK 53, Expo Go's Android build no longer supports remote push at all — the module throws the moment it's imported. `lib/push.ts` detects this (`IS_EXPO_GO`) and skips registration silently rather than crashing the app, so nothing breaks — but no push, announcement or personal, will ever arrive while running through Expo Go. The in-app bell and notification list work regardless; push itself starts working the moment the app runs from a real EAS build instead, with nothing else to configure.
+**Push cannot be tested in Expo Go.** Since Expo SDK 53, Expo Go's Android build no longer supports remote push at all — the module throws the moment it's imported. `lib/push.ts` detects this (`IS_EXPO_GO`) and skips registration silently rather than crashing the app, so nothing breaks — but no push, announcement or personal, will ever arrive while running through Expo Go. The in-app bell and notification list work regardless; push itself needs a real EAS build, plus Firebase: both apps are registered in the `com-uzhavan-app` Firebase project and carry their `google-services.json`, and what remains is uploading an FCM V1 service account key to Expo with `eas credentials`. The steps are in [`docs/deployment-handoff.md`](docs/deployment-handoff.md).
 
 ---
 
