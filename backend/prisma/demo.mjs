@@ -13,11 +13,11 @@
 const BASE = process.env.UZHAVAN_API ?? "http://127.0.0.1:4000/api";
 
 const DEMO_CROPS = [
-  { owner: "arul", title: "Alphonso Mangoes", category: "Fruits · Mango", status: "ready", expectedKg: 6000, pricePerKg: 110, harvestDate: "12 Oct 2026", imageKey: "grove", about: "Hand-picked Alphonso mangoes from a 9-acre orchard in Natham. Sorted by size, packed in ventilated crates and ripened naturally — suited to wholesale and retail chains." },
-  { owner: "arul", title: "Lucknow 49 Guava", category: "Fruits · Guava", status: "ready", expectedKg: 4000, pricePerKg: 38, harvestDate: "8 Oct 2026", imageKey: "orchard", about: "Firm, white-fleshed guava with a long shelf life. Picked at the right stage for a three-day transit to Chennai." },
-  { owner: "muthu", title: "Dry Red Chillies", category: "Spices · Chilli", status: "ready", expectedKg: 3000, pricePerKg: 210, harvestDate: "5 Oct 2026", imageKey: "turmeric", about: "Sun-dried Guntur-type chillies, stems on, moisture under 10%. Bright colour and good heat for masala and powder making." },
-  { owner: "muthu", title: "Sona Masoori Paddy", category: "Grains · Paddy", status: "upcoming", statusLabel: "Harvest in 4 weeks", expectedKg: 12000, pricePerKg: 24, harvestDate: "2 Nov 2026", imageKey: "farm", about: "Sona Masoori paddy from a 20-acre field, harvest expected in the first week of November." },
-  { owner: "kannan", title: "Hill Garlic", category: "Vegetables · Garlic", status: "ready", expectedKg: 2500, pricePerKg: 85, harvestDate: "6 Oct 2026", imageKey: "grove", about: "Nilgiri hill garlic with large cloves and a strong flavour. Cured for ten days and graded." },
+  { owner: "arul", title: "Kodaikanal Strawberries", category: "Fruits · Strawberry", status: "ready", expectedKg: 3000, pricePerKg: 140, harvestDate: "12 Oct 2026", imageKey: "grove", about: "Sweet, firm strawberries from the Kodaikanal hills, picked at dawn and packed in cold punnets. Sorted by size and suited to retail chains and juice bars." },
+  { owner: "arul", title: "Sweet Corn", category: "Vegetables · Sweet corn", status: "ready", expectedKg: 4000, pricePerKg: 28, harvestDate: "8 Oct 2026", imageKey: "orchard", about: "Tender sweet corn cobs, harvested the same morning and sold in the husk. A short shelf life, so it suits quick wholesale turnaround." },
+  { owner: "muthu", title: "Dry Red Chillies", category: "Spices · Chilli", status: "ready", expectedKg: 3000, pricePerKg: 210, harvestDate: "5 Oct 2026", imageKey: "farm", about: "Sun-dried Guntur-type chillies, stems on, moisture under 10%. Bright colour and good heat for masala and powder making." },
+  { owner: "muthu", title: "Sona Masoori Paddy", category: "Grains · Paddy", status: "upcoming", statusLabel: "Harvest in 4 weeks", expectedKg: 12000, pricePerKg: 24, harvestDate: "2 Nov 2026", imageKey: "orchard", about: "Sona Masoori paddy from a 20-acre field, harvest expected in the first week of November." },
+  { owner: "kannan", title: "Hill Garlic", category: "Vegetables · Garlic", status: "ready", expectedKg: 2500, pricePerKg: 85, harvestDate: "6 Oct 2026", imageKey: "farm", about: "Nilgiri hill garlic with large cloves and a strong flavour. Cured for ten days and graded." },
   { owner: "kannan", title: "Nilgiri Carrots", category: "Vegetables · Carrot", status: "ready", expectedKg: 5000, pricePerKg: 32, harvestDate: "4 Oct 2026", imageKey: "farm", about: "Sweet, even-sized carrots from the Nilgiri highlands, washed and bagged on the day of harvest." },
 ];
 
@@ -77,7 +77,7 @@ async function add() {
   }
 
   const mine = must(await call("/farmer/crops", { token: tokens.arul }), "list crops");
-  if ((mine ?? []).some((c) => c.title === "Alphonso Mangoes")) {
+  if ((mine ?? []).some((c) => c.title === "Kodaikanal Strawberries")) {
     say("The showcase is already loaded. Run with --remove first to rebuild it.");
     return;
   }
@@ -98,8 +98,8 @@ async function add() {
   const accept = async (title, id, price) => must(await call(`/farmer/requests/${id}/accept`, { method: "POST", token: tokens[crop[title].owner], body: price ? { finalPricePerKg: price } : {} }), `accept ${title}`);
   const confirm = async (id) => must(await call(`/requests/${id}/confirm`, { method: "POST", token: buyer }), "confirm");
 
-  say("1. A request waiting on the farmer (Alphonso Mangoes)");
-  await request("Alphonso Mangoes", 1000);
+  say("1. A request waiting on the farmer (Kodaikanal Strawberries)");
+  await request("Kodaikanal Strawberries", 1000);
 
   say("2. A request the farmer has priced, waiting on the buyer (Dry Red Chillies)");
   const chilli = await request("Dry Red Chillies", 600);
@@ -109,9 +109,9 @@ async function add() {
   const paddy = await request("Sona Masoori Paddy", 4000);
   must(await call(`/farmer/requests/${paddy.id}/decline`, { method: "POST", token: tokens.muthu, body: { reason: "Harvest has moved to next month. Please request again then." } }), "decline");
 
-  say("4. A confirmed order, payment due (Lucknow 49 Guava)");
-  const guava = await request("Lucknow 49 Guava", 800);
-  await accept("Lucknow 49 Guava", guava.id);
+  say("4. A confirmed order, payment due (Sweet Corn)");
+  const guava = await request("Sweet Corn", 800);
+  await accept("Sweet Corn", guava.id);
   await confirm(guava.id);
 
   const bookAndPay = async (orderId, loadKg) => {
@@ -148,10 +148,10 @@ async function add() {
 
   say("7. A conversation between the buyer and Arul Farms");
   const summary = must(await call("/farmer/summary", { token: tokens.arul }), "farm");
-  const convo = must(await call("/conversations", { method: "POST", token: buyer, body: { farmId: summary.farm.id, cropId: crop["Alphonso Mangoes"].id } }), "start chat");
+  const convo = must(await call("/conversations", { method: "POST", token: buyer, body: { farmId: summary.farm.id, cropId: crop["Kodaikanal Strawberries"].id } }), "start chat");
   const say2 = async (who, body) => must(await call(`/conversations/${convo.id}/messages`, { method: "POST", token: tokens[who], body: { body } }), "message");
-  await say2("karthik", "Good morning. Are the Alphonso mangoes ripe enough for a three-day trip to Chennai?");
-  await say2("arul", "Good morning. Yes, they are picked firm and ripen on the way. I can sort out the larger sizes for you.");
+  await say2("karthik", "Good morning. Are the strawberries fresh enough for a three-day trip to Chennai?");
+  await say2("arul", "Good morning. Yes, they are picked at dawn and packed cold, so they travel well. I can set aside the larger berries for you.");
   await say2("karthik", "Great. I have sent a request for 1,000 kg. Can you do a better price at 2,000 kg?");
 
   say("\nShowcase ready. Sign in as karthik@uzhavan.app (buyer) or arul@, muthu@, kannan@ (farmers) or selvam@ (driver). Password: uzhavan123");
