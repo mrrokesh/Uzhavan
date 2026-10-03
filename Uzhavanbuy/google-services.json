@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "910422397150",
+    "project_id": "com-uzhavan-app",
+    "storage_bucket": "com-uzhavan-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:910422397150:android:6cb263d821f7c79a11b24f",
+        "android_client_info": {
+          "package_name": "com.uzhavan.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_G4gmqo80UX8lucTGy4j403RZ66OToQA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:910422397150:android:425eed0ccb17160311b24f",
+        "android_client_info": {
+          "package_name": "com.uzhavan.buy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_G4gmqo80UX8lucTGy4j403RZ66OToQA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
