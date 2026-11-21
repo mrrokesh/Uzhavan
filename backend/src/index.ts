@@ -1,7 +1,10 @@
 import compression from "compression";
 import cors from "cors";
 import express from "express";
+import fs from "fs";
 import morgan from "morgan";
+import path from "path";
+import { fileURLToPath } from "url";
 import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { errorHandler, notFound } from "./http.js";
@@ -61,20 +64,19 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-// Opening the host in a browser used to hit the catch-all and show {"error":"Not found"}.
-// The address itself is the API, so answer here. Health checks also call GET /.
+// The admin console is built into backend/admin and served from this same host.
+// Compiled output lives in dist/, so the folder is one level up from this file
+// both in src/ (dev) and dist/ (production).
+const adminDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../admin");
+const adminIndex = path.join(adminDir, "index.html");
+const adminReady = fs.existsSync(adminIndex);
+
+app.use(express.static(adminDir, { index: false, maxAge: "1h" }));
+
+// Health checks call GET / without asking for HTML. A browser gets the console.
 app.get("/", (req, res) => {
-  const accept = req.get("accept") ?? "";
-  if (accept.includes("text/html")) {
-    res.type("html").send(`<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>Uzhavan API</title>
-<body style="font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; background: #fff; color: #17191C">
-<h1>Uzhavan API</h1>
-<p>This address is running. The apps call <code>/api/</code>.</p>
-</body>`);
+  if (adminReady && (req.get("accept") ?? "").includes("text/html")) {
+    res.sendFile(adminIndex);
     return;
   }
   res.json({ ok: true, service: "Uzhavan API" });
@@ -111,6 +113,14 @@ app.use("/api/trucks", trucksRouter);
 app.use("/api/requests", requestsRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/bookings", bookingsRouter);
+
+// Console routes such as /verification are handled by the browser app.
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  if (req.path.startsWith("/api")) return next();
+  if (!adminReady || !(req.get("accept") ?? "").includes("text/html")) return next();
+  res.sendFile(adminIndex);
+});
 
 app.use(notFound);
 app.use(errorHandler);
