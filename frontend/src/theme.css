@@ -1,15 +1,15 @@
-/* Uzhavan console — same palette as the apps, denser layout for desktop work. */
+/* Uzhavan console — white page, farmer green, dense enough for desktop work. */
 
 :root {
-  --forest: #1b5e3b;
-  --forest-dark: #164a2f;
-  --mint: #e8f3ec;
-  --cream: #faf6f0;
+  --forest: #157a32;
+  --forest-dark: #0f5c26;
+  --mint: #e7f3ea;
+  --cream: #f4f5f6;
   --white: #ffffff;
-  --ink: #1a1a1a;
+  --ink: #17191c;
   --muted: #6b7280;
   --faint: #9ca3af;
-  --line: #e8e2d8;
+  --line: #e1e3e2;
   --amber: #f5a623;
   --amber-bg: #fdf3e0;
   --amber-text: #9a6400;
@@ -28,7 +28,7 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--cream);
+  background: var(--white);
   color: var(--ink);
   font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -122,11 +122,11 @@ table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th {
   text-align: left; padding: 9px 16px; font-size: 11px; font-weight: 700;
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint);
-  border-bottom: 1px solid var(--line); background: #fcfaf7; white-space: nowrap;
+  border-bottom: 1px solid var(--line); background: var(--white); white-space: nowrap;
 }
 td { padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: 0; }
-tbody tr:hover { background: #fcfaf7; }
+tbody tr:hover { background: var(--cream); }
 td .sub { display: block; color: var(--muted); font-size: 12px; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 
@@ -210,7 +210,7 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); 
   display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px;
   border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--white);
 }
-.perm:hover { background: #fcfaf7; }
+.perm:hover { background: var(--cream); }
 .perm.on { border-color: var(--forest); background: var(--mint); }
 .perm.locked { opacity: 0.55; cursor: not-allowed; background: var(--cream); }
 .perm input { width: auto; margin: 2px 0 0; }
