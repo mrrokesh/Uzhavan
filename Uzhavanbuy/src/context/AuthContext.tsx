@@ -16,6 +16,7 @@ import { registerForPush, unregisterPush } from "../lib/push";
 export type BuyerRegistration = {
   role: "BUYER";
   email: string;
+  emailCode: string;
   password: string;
   name: string;
   phone: string;
@@ -27,6 +28,7 @@ export type BuyerRegistration = {
 export type FarmerRegistration = {
   role: "FARMER";
   email: string;
+  emailCode: string;
   password: string;
   name: string;
   phone: string;
@@ -38,6 +40,7 @@ export type FarmerRegistration = {
 export type DriverRegistration = {
   role: "DRIVER";
   email: string;
+  emailCode: string;
   password: string;
   name: string;
   phone: string;

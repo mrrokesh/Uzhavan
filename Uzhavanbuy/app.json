@@ -10,7 +10,7 @@
     "android": {
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#1B5E3B"
+        "backgroundColor": "#FFFFFF"
       }
     },
     "plugins": [
@@ -19,14 +19,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FAF6F0"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       "expo-secure-store",
       [
         "expo-notifications",
         {
-          "color": "#1B5E3B"
+          "color": "#157A32"
         }
       ]
     ],

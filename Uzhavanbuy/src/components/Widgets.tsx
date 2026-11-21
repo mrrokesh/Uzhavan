@@ -5,26 +5,31 @@ import type { Crop } from "../api/types";
 import { kg } from "../lib/format";
 import { colors, shadow } from "../theme";
 import { Chip } from "./ui";
+import { Avatar } from "./Avatar";
 
 export function FeedCard({
   crop,
   saved,
   onOpen,
   onSave,
+  onFarm,
 }: {
   crop: Crop;
   saved?: boolean;
   onOpen: () => void;
   onSave: () => void;
+  onFarm: () => void;
 }) {
+  const distance = crop.distanceKm == null ? crop.district : crop.distanceKm === 0 ? crop.district : `${crop.district} · ${crop.distanceKm} km`;
   return (
     <View style={styles.card}>
       <Pressable onPress={onOpen}>
         <View style={styles.farmer}>
-          <Image source={crop.avatar} style={styles.avatar} />
+          <Avatar size={28} />
           <Text style={styles.farmName}>
-            {crop.farmName} <Text style={{ color: colors.blueTick }}>✓</Text>
-            <Text style={styles.muted}> · {crop.district}</Text>
+            {crop.farmName}{" "}
+            {crop.sellerVerified ? <Text style={{ color: colors.blueTick }}>✓ </Text> : null}
+            <Text style={styles.muted}>· {distance}</Text>
           </Text>
         </View>
         <View style={styles.body}>
@@ -39,19 +44,16 @@ export function FeedCard({
           </View>
           <View style={styles.thumbWrap}>
             <Image source={crop.image} style={styles.thumb} />
-            {crop.hasVideo ? (
-              <View style={styles.play}>
-                <Ionicons name="play" size={14} color={colors.ink} />
-              </View>
-            ) : null}
           </View>
         </View>
       </Pressable>
       <View style={styles.actions}>
-        <Pressable onPress={onSave}>
+        <Pressable onPress={onSave} accessibilityLabel={saved ? "Unsave crop" : "Save crop"}>
           <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.forest : colors.muted} />
         </Pressable>
-        <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+        <Pressable onPress={onFarm} accessibilityLabel="View farm">
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+        </Pressable>
       </View>
     </View>
   );
@@ -85,7 +87,7 @@ export function Stepper({
   return (
     <View style={styles.stepper}>
       <Pressable onPress={onDec} style={styles.stepMinus}>
-        <Text style={styles.stepGlyph}>−</Text>
+        <Text style={[styles.stepGlyph, { color: colors.white }]}>-</Text>
       </Pressable>
       <Text style={styles.stepValue}>{new Intl.NumberFormat("en-IN").format(value)} kg</Text>
       <Pressable onPress={onInc} style={styles.stepPlus}>
@@ -159,7 +161,6 @@ export function RouteStops({ pickup, drop }: { pickup: string; drop: string }) {
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
   farmer: { flexDirection: "row", alignItems: "center", gap: 8 },
-  avatar: { width: 28, height: 28, borderRadius: 14 },
   farmName: { fontSize: 13, fontWeight: "500", color: colors.ink },
   muted: { color: colors.muted, fontWeight: "400" },
   body: { marginTop: 10, flexDirection: "row", gap: 12 },
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.mint,
+    backgroundColor: colors.forest,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -220,10 +221,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   dotInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amberText },
-  dotPending: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#d8d3cb", backgroundColor: colors.white },
-  line: { width: 1, flex: 1, minHeight: 22, backgroundColor: "#e4dfd6", marginVertical: 4 },
+  dotPending: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#D5D8D6", backgroundColor: colors.white },
+  line: { width: 1, flex: 1, minHeight: 22, backgroundColor: "#E1E3E2", marginVertical: 4 },
   stepTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  dash: { position: "absolute", left: 7, top: 8, bottom: 8, borderLeftWidth: 2, borderStyle: "dashed", borderColor: "#1B5E3B66" },
+  dash: { position: "absolute", left: 7, top: 8, bottom: 8, borderLeftWidth: 2, borderStyle: "dashed", borderColor: colors.line },
   pin: { position: "absolute", left: -20, top: 6, width: 14, height: 14, borderRadius: 7 },
   stopLabel: { fontSize: 11, fontWeight: "500", color: colors.muted, letterSpacing: 0.4 },
   stopValue: { fontSize: 14, fontWeight: "600", color: colors.ink },

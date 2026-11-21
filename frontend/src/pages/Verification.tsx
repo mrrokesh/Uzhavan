@@ -71,6 +71,7 @@ export function Verification() {
   const { can } = useAuth();
   const qc = useQueryClient();
   const [tab, setTab] = useState<"PENDING" | "VERIFIED" | "REJECTED">("PENDING");
+  const [role, setRole] = useState<"ALL" | "FARMER" | "DRIVER" | "BUYER">("FARMER");
   const [reviewing, setReviewing] = useState<KycRow | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -101,14 +102,14 @@ export function Verification() {
 
   if (!can("KYC_REVIEW")) return <NoAccess what="review verification documents" />;
 
-  const rows = queue.data ?? [];
+  const rows = (queue.data ?? []).filter((r) => role === "ALL" || r.role === role);
 
   return (
     <>
       <h1>Verification</h1>
       <p className="muted" style={{ marginTop: 4, marginBottom: 18 }}>
-        Check the number against the document before approving. Only verified accounts get the badge
-        other users see.
+        Farmers, drivers and buyers stay unverified until you approve them here. The badge in the app
+        appears only after that.
       </p>
 
       <div className="row" style={{ marginBottom: 14 }}>
@@ -119,6 +120,16 @@ export function Verification() {
             onClick={() => setTab(t)}
           >
             {titleCase(t)}
+          </button>
+        ))}
+        <span className="grow" />
+        {(["FARMER", "DRIVER", "BUYER", "ALL"] as const).map((r) => (
+          <button
+            key={r}
+            className={role === r ? "btn btn-sm" : "btn-ghost btn-sm"}
+            onClick={() => setRole(r)}
+          >
+            {r === "ALL" ? "All" : titleCase(r) + "s"}
           </button>
         ))}
       </div>

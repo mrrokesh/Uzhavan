@@ -25,6 +25,7 @@ trucksRouter.get(
       where: {
         driver: {
           online: true,
+          verified: true,
           bookings: {
             none: {
               status: { in: ["PAID", "ACCEPTED", "ARRIVED_PICKUP", "LOADED", "IN_TRANSIT"] },

@@ -78,6 +78,29 @@ export function Overview() {
         </div>
       </div>
 
+      <div className="stats" style={{ marginTop: 12 }}>
+        <div className="stat">
+          <div className="n">{inr(d?.commission ?? 0)}</div>
+          <div className="l">Commission collected · {d?.commissionRate ?? 5}%</div>
+        </div>
+        <div className="stat">
+          <div className="n">{d?.verifiedFarmers ?? 0}</div>
+          <div className="l">Verified farmers</div>
+        </div>
+        <div className="stat">
+          <div className="n">{d?.listedCrops ?? 0}</div>
+          <div className="l">Crops listed</div>
+        </div>
+        <div className={`stat${(d?.truckQueue ?? 0) > 0 ? " warn" : ""}`}>
+          <div className="n">{d?.truckQueue ?? 0}</div>
+          <div className="l">Trucks awaiting approval</div>
+        </div>
+        <div className={`stat${(d?.errorsToday ?? 0) > 0 ? " bad" : ""}`}>
+          <div className="n">{d?.errorsToday ?? 0}</div>
+          <div className="l">App errors today</div>
+        </div>
+      </div>
+
       {can("TICKETS_VIEW") ? (
         <div style={{ marginTop: 20 }}>
           <Card

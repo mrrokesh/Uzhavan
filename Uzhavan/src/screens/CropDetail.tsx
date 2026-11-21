@@ -163,7 +163,7 @@ export function CropDetail() {
 
           <View style={styles.specs}>
             <Spec label="Farm location" value={crop.location} icon="location-outline" />
-            <Spec label="Category" value={crop.category} icon="leaf-outline" />
+            <Spec label="Category" value={crop.category} icon="grid-outline" />
             <Spec label="Expected harvest" value={crop.harvestDate} icon="calendar-outline" />
             <Spec label="Minimum order" value={kg(crop.minOrderKg)} icon="bag-outline" />
           </View>

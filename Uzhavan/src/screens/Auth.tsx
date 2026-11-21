@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,11 +15,13 @@ import { AppHeader, Screen } from "../components/Chrome";
 import { Logo } from "../components/Logo";
 import { Field, PrimaryButton } from "../components/ui";
 import { useAuth, type RegisterInput } from "../context/AuthContext";
-import { ApiError } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 import { APP_NAME, APP_ROLES, IS_BUYER_APP, OTHER_APP_NAME } from "../lib/appInfo";
 import type { AuthStackParamList } from "../navigation/types";
 import type { Role } from "../api/types";
+import { useI18n } from "../i18n";
 import { colors, shadow } from "../theme";
+import { FormScroll } from "../components/keyboard";
 
 function errorMessage(err: unknown) {
   if (err instanceof ApiError) return err.message;
@@ -28,7 +30,7 @@ function errorMessage(err: unknown) {
 
 const ALL_ROLES: { role: Role; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }[] = [
   { role: "BUYER", icon: "storefront-outline", title: "I buy crops", sub: "Wholesale buyer or trader" },
-  { role: "FARMER", icon: "leaf-outline", title: "I sell crops", sub: "Farmer listing a harvest" },
+  { role: "FARMER", icon: "basket-outline", title: "I sell crops", sub: "Farmer listing a harvest" },
   { role: "DRIVER", icon: "car-outline", title: "I drive a truck", sub: "Move crops farm to warehouse" },
 ];
 
@@ -37,6 +39,7 @@ const ROLES = ALL_ROLES.filter((r) => APP_ROLES.includes(r.role));
 
 export function Login() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const { t } = useI18n();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +48,7 @@ export function Login() {
 
   const submit = async () => {
     if (!email.trim() || !password) {
-      setError("Enter your email and password");
+      setError(t("login.missing"));
       return;
     }
     setWorking(true);
@@ -60,20 +63,16 @@ export function Login() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Screen footer={<PrimaryButton label="Sign in" onPress={submit} loading={working} disabled={working} />}>
-        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }}>
+      <Screen footer={<PrimaryButton label={t("login.signIn")} onPress={submit} loading={working} disabled={working} />}>
+        <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           <Logo />
-          <Text style={styles.h1}>Welcome back</Text>
-          <Text style={styles.lead}>
-            {IS_BUYER_APP
-              ? "Buy direct from Tamil Nadu farms."
-              : "Sell your harvest, or haul it, across Tamil Nadu."}
-          </Text>
+          <Text style={styles.h1}>{t("login.welcome")}</Text>
+          <Text style={styles.lead}>{t("login.lead")}</Text>
 
           <View style={styles.form}>
             <Field
-              label="Email"
+              label={t("login.email")}
               value={email}
               onChangeText={setEmail}
               placeholder="you@business.com"
@@ -83,7 +82,7 @@ export function Login() {
               textContentType="emailAddress"
             />
             <Field
-              label="Password"
+              label={t("login.password")}
               value={password}
               onChangeText={setPassword}
               placeholder="Your password"
@@ -97,7 +96,7 @@ export function Login() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable onPress={() => navigation.navigate("ForgotPassword")} style={styles.forgot}>
-            <Text style={styles.forgotText}>Forgot your password?</Text>
+            <Text style={styles.forgotText}>{t("login.forgot")}</Text>
           </Pressable>
 
           <Pressable
@@ -109,7 +108,7 @@ export function Login() {
             style={styles.switch}
           >
             <Text style={styles.switchText}>
-              New here? <Text style={styles.link}>Create an account</Text>
+              {t("login.new")} <Text style={styles.link}>{t("login.create")}</Text>
             </Text>
           </Pressable>
 
@@ -118,7 +117,7 @@ export function Login() {
               ? `Farmer or truck driver? Use the ${OTHER_APP_NAME} app instead.`
               : `Buying in bulk? Use the ${OTHER_APP_NAME} app instead.`}
           </Text>
-        </ScrollView>
+        </FormScroll>
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -189,8 +188,33 @@ export function CreateAccount() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("+91 ");
   const [email, setEmail] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+
+  const sendCode = async () => {
+    const address = email.trim().toLowerCase();
+    if (!address.includes("@")) {
+      setError("Enter the email address first.");
+      return;
+    }
+    setSendingCode(true);
+    setError(null);
+    try {
+      await api("/auth/email/otp", { method: "POST", body: { email: address } });
+      setCodeSentTo(address);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 404
+          ? "Email verification isn’t on the live server yet."
+          : errorMessage(err),
+      );
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   // Buyer
   const [business, setBusiness] = useState("");
@@ -205,7 +229,9 @@ export function CreateAccount() {
   const [plate, setPlate] = useState("");
   const [capacity, setCapacity] = useState("");
   const [price, setPrice] = useState("");
+  const [ratePerKm, setRatePerKm] = useState("");
   const [truckBody, setTruckBody] = useState<"Open body" | "Closed body">("Open body");
+  const [driverStep, setDriverStep] = useState(0);
 
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -220,8 +246,16 @@ export function CreateAccount() {
     setWorking(true);
     setError(null);
 
+    const address = email.trim().toLowerCase();
+    if (!/^[0-9]{6}$/.test(emailCode.trim()) || codeSentTo !== address) {
+      setError("Send a code to this email, then enter the 6 digits from the message.");
+      setWorking(false);
+      return;
+    }
+
     const common = {
-      email: email.trim(),
+      email: address,
+      emailCode: emailCode.trim(),
       password,
       name: name.trim(),
       phone: phone.trim(),
@@ -253,6 +287,7 @@ export function CreateAccount() {
         capacityTons: Number(capacity),
         body: truckBody,
         price: Number(price),
+        ratePerKm: ratePerKm.trim() ? Number(ratePerKm) : 0,
       };
     }
 
@@ -265,23 +300,62 @@ export function CreateAccount() {
     }
   };
 
+  const continueDriver = () => {
+    const address = email.trim().toLowerCase();
+    if (name.trim().length < 2 || phone.trim().length < 8) {
+      setError("Enter your name and phone.");
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(emailCode.trim()) || codeSentTo !== address) {
+      setError("Send a code to this email, then enter the 6 digits from the message.");
+      return;
+    }
+    if (password.length < 8 || password !== confirm) {
+      setError(password.length < 8 ? "Use at least 8 characters." : "Those passwords don’t match.");
+      return;
+    }
+    setError(null);
+    setDriverStep(1);
+  };
+
+  const driverOnVehicle = role === "DRIVER" && driverStep === 1;
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
-        footer={<PrimaryButton label="Create account" onPress={submit} loading={working} disabled={working} />}
+        footer={
+          role === "DRIVER" && driverStep === 0 ? (
+            <PrimaryButton label="Continue" onPress={continueDriver} />
+          ) : (
+            <PrimaryButton label="Create account" onPress={submit} loading={working} disabled={working} />
+          )
+        }
       >
         <AppHeader title="Create account" />
-        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-          <Text style={styles.h1}>{t.h1}</Text>
-          <Text style={styles.lead}>{t.lead}</Text>
+        <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+          <Text style={styles.h1}>{driverOnVehicle ? "Your truck and fare" : t.h1}</Text>
+          <Text style={styles.lead}>
+            {driverOnVehicle
+              ? "Buyers see this fare before they book you. After the account is created you’ll add your licence and vehicle papers."
+              : t.lead}
+          </Text>
+          {role === "DRIVER" ? (
+            <Text style={styles.section}>Step {driverStep + 1} of 2 · {driverStep === 0 ? "You" : "Truck"}</Text>
+          ) : null}
 
+          {driverOnVehicle ? null : (
+            <>
           <Text style={styles.section}>About you</Text>
           <View style={styles.form}>
             <Field label="Your name" value={name} onChangeText={setName} placeholder="Karthik Rajan" autoComplete="name" textContentType="name" />
             <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="+91 98430 11220" keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" />
           </View>
+            </>
+          )}
 
-          <Text style={styles.section}>{t.section}</Text>
+          {role === "DRIVER" && driverStep === 0 ? null : (
+          <>
+          <Text style={styles.section}>{driverOnVehicle ? "Truck and fare" : t.section}</Text>
           <View style={styles.form}>
             {role === "BUYER" ? (
               <>
@@ -299,12 +373,13 @@ export function CreateAccount() {
               </>
             ) : null}
 
-            {role === "DRIVER" ? (
+            {role === "DRIVER" && driverStep === 1 ? (
               <>
                 <Field label="Vehicle model" value={truckName} onChangeText={setTruckName} placeholder="Mini Truck 3.5T" />
                 <Field label="Number plate" value={plate} onChangeText={setPlate} placeholder="TN 30 AB 4821" autoCapitalize="characters" />
                 <Field label="Load capacity (tons)" value={capacity} onChangeText={setCapacity} placeholder="3.5" keyboardType="decimal-pad" />
-                <Field label="Your base fare (₹)" value={price} onChangeText={setPrice} placeholder="3450" keyboardType="number-pad" />
+                <Field label="Standard fare (₹)" value={price} onChangeText={setPrice} placeholder="1500" keyboardType="number-pad" />
+                <Field label="Per kilometre (₹)" value={ratePerKm} onChangeText={setRatePerKm} placeholder="25" keyboardType="number-pad" />
                 <View>
                   <Text style={styles.fieldLabel}>Body type</Text>
                   <View style={styles.segment}>
@@ -322,13 +397,36 @@ export function CreateAccount() {
               </>
             ) : null}
           </View>
+          </>
+          )}
 
+          {driverOnVehicle ? (
+            <Pressable onPress={() => setDriverStep(0)} style={{ marginTop: 8 }}>
+              <Text style={styles.link}>Back</Text>
+            </Pressable>
+          ) : null}
+
+          {driverOnVehicle ? null : (
+          <>
           <Text style={styles.section}>Sign-in details</Text>
           <View style={styles.form}>
             <Field label="Email" value={email} onChangeText={setEmail} placeholder="you@business.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" />
+            <Pressable onPress={() => void sendCode()} disabled={sendingCode}>
+              <Text style={styles.link}>{sendingCode ? "Sending code…" : codeSentTo ? "Send a new code" : "Send verification code"}</Text>
+            </Pressable>
+            <Field
+              label="Email code"
+              value={emailCode}
+              onChangeText={setEmailCode}
+              placeholder="6-digit code"
+              keyboardType="number-pad"
+            />
+            {codeSentTo ? <Text style={styles.hint}>Code sent to {codeSentTo}. It expires in 5 minutes.</Text> : null}
             <Field label="Password" value={password} onChangeText={setPassword} placeholder="At least 8 characters" secureTextEntry autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" />
             <Field label="Confirm password" value={confirm} onChangeText={setConfirm} placeholder="Repeat password" secureTextEntry autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" />
           </View>
+          </>
+          )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -337,7 +435,7 @@ export function CreateAccount() {
               Already have an account? <Text style={styles.link}>Sign in</Text>
             </Text>
           </Pressable>
-        </ScrollView>
+        </FormScroll>
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -353,6 +451,7 @@ const styles = StyleSheet.create({
   switch: { marginTop: 20, alignItems: "center" },
   switchText: { fontSize: 14, color: colors.muted },
   link: { color: colors.forest, fontWeight: "600" },
+  hint: { fontSize: 12, color: colors.muted },
   forgot: { marginTop: 16, alignItems: "center" },
   forgotText: { fontSize: 13, fontWeight: "600", color: colors.forest },
   otherApp: {

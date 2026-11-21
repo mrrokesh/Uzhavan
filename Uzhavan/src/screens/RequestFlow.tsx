@@ -363,7 +363,7 @@ export function RequestDetails() {
         {pending ? (
           <>
             <InfoNote>
-              <Ionicons name="leaf-outline" size={16} color={colors.forest} />
+              <Ionicons name="time-outline" size={16} color={colors.forest} />
               <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>
                 This updates automatically when the farmer responds.
               </Text>
@@ -432,5 +432,5 @@ const styles = StyleSheet.create({
   accept: { flexDirection: "row", gap: 12, backgroundColor: colors.mint, borderRadius: 16, padding: 14 },
   check: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
   acceptTitle: { fontSize: 15, fontWeight: "600", color: colors.forest },
-  acceptSub: { marginTop: 2, fontSize: 12.5, color: "#1B5E3BCC" },
+  acceptSub: { marginTop: 2, fontSize: 12.5, color: "#157A32CC" },
 });

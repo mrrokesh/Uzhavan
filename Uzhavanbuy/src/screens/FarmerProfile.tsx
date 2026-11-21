@@ -8,6 +8,7 @@ import { useCrop, useFarmCrops } from "../api/hooks";
 import { inr, kg } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
+import { Avatar } from "../components/Avatar";
 
 /** The "View farmer ›" destination — farm details plus their other listings. */
 export function FarmerProfile() {
@@ -35,10 +36,11 @@ export function FarmerProfile() {
       <AppHeader title={farm.farmName} />
       <ScrollView contentContainerStyle={styles.pad}>
         <View style={styles.header}>
-          <Image source={farm.avatar} style={styles.av} />
+          <Avatar size={64} />
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>
-              {farm.farmName} <Text style={{ color: colors.blueTick }}>✓</Text>
+              {farm.farmName}{" "}
+              {farm.sellerVerified ? <Text style={{ color: colors.blueTick }}>✓</Text> : null}
             </Text>
             <Text style={styles.muted}>{farm.ownerName}</Text>
             <Text style={styles.muted}>{farm.location}</Text>
@@ -46,7 +48,7 @@ export function FarmerProfile() {
         </View>
 
         <View style={styles.stats}>
-          <Stat n={`★ ${farm.rating.toFixed(1)}`} l="Rating" />
+          <Stat n={farm.rating.toFixed(1)} l="Rating" />
           <Stat n={String(listings.length)} l="Listings" />
           <Stat n={kg(totalListed)} l="Expected" />
         </View>
@@ -54,7 +56,9 @@ export function FarmerProfile() {
         <View style={styles.trust}>
           <Ionicons name="shield-checkmark-outline" size={16} color={colors.forest} />
           <Text style={styles.trustText}>
-            Verified farm. Prices are set by the farmer and confirmed before any payment.
+            {farm.sellerVerified
+              ? "Documents checked. Prices are set by the farmer and confirmed before any payment."
+              : "Prices are set by the farmer and confirmed before any payment. Documents are not verified yet."}
           </Text>
         </View>
 
@@ -104,7 +108,6 @@ function Stat({ n, l }: { n: string; l: string }) {
 const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16, paddingBottom: 32 },
   header: { flexDirection: "row", gap: 14, alignItems: "center", backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
-  av: { width: 64, height: 64, borderRadius: 32 },
   name: { fontSize: 17, fontWeight: "700", color: colors.ink },
   muted: { fontSize: 12.5, color: colors.muted, marginTop: 2 },
   tiny: { fontSize: 11.5, color: colors.muted },

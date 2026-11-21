@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { useKeyboardInset } from "./keyboard";
 import { colors } from "../theme";
 
 export function AppHeader({ title }: { title?: string }) {
@@ -25,8 +26,9 @@ export function Screen({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const keyboardInset = useKeyboardInset();
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { paddingBottom: keyboardInset }]} edges={["top"]}>
       <View style={styles.body}>{children}</View>
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </SafeAreaView>

@@ -1,3 +1,4 @@
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import morgan from "morgan";
@@ -8,6 +9,7 @@ import { startTicketSweeper } from "./tickets/assignment.js";
 import { startPayoutSweeper } from "./payouts.js";
 import { payoutsRouter, adminPayoutsRouter } from "./routes/payouts.js";
 import { authRouter } from "./routes/auth.js";
+import { errorsRouter } from "./routes/errors.js";
 import { passwordRouter } from "./routes/password.js";
 import { reviewsRouter } from "./routes/reviews.js";
 import { chatRouter } from "./routes/chat.js";
@@ -25,6 +27,7 @@ import { requireAdmin } from "./session.js";
 import { encrypt } from "./crypto.js";
 import { modeForKey } from "./payments/razorpay.js";
 import { cropsRouter } from "./routes/crops.js";
+import { farmsRouter } from "./routes/farms.js";
 import { farmerRouter } from "./routes/farmer.js";
 import { driverRouter } from "./routes/driver.js";
 import { trucksRouter } from "./routes/trucks.js";
@@ -34,6 +37,7 @@ import { bookingsRouter } from "./routes/bookings.js";
 
 const app = express();
 
+app.use(compression());
 app.use(
   cors({
     origin: env.corsOrigin === "*" ? true : env.corsOrigin.split(",").map((s) => s.trim()),
@@ -57,6 +61,7 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
+app.use("/api/errors", errorsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth/password", passwordRouter);
 app.use("/api/me", meRouter);
@@ -76,6 +81,7 @@ app.use("/api/admin", gatewayRouter);
 app.use("/api/admin", moderationRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/crops", cropsRouter);
+app.use("/api/farms", farmsRouter);
 app.use("/api/farmer", farmerRouter);
 app.use("/api/driver", driverRouter);
 app.use("/api/trucks", trucksRouter);

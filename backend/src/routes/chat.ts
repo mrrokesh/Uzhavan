@@ -75,8 +75,9 @@ chatRouter.get(
 );
 
 const startBody = z.object({
-  farmId: z.string().min(1),
+  farmId: z.string().min(1).optional(),
   cropId: z.string().min(1).optional(),
+  buyerId: z.string().min(1).optional(),
 });
 
 /**
@@ -88,8 +89,31 @@ chatRouter.post(
   "/conversations",
   asyncHandler(async (req, res) => {
     const user = await currentUser(req);
+    const body = startBody.parse(req.body);
+
+    if (user.role === "FARMER") {
+      if (!body.buyerId) throw new HttpError(400, "Choose a buyer to message");
+      const [farm, buyer] = await Promise.all([
+        prisma.farm.findUnique({ where: { ownerId: user.id } }),
+        prisma.user.findUnique({ where: { id: body.buyerId } }),
+      ]);
+      if (!farm) throw new HttpError(404, "Farm not found");
+      if (!buyer || buyer.role !== "BUYER" || buyer.status !== "ACTIVE") {
+        throw new HttpError(404, "Buyer not found");
+      }
+      const convo = await prisma.conversation.upsert({
+        where: { buyerId_farmId: { buyerId: buyer.id, farmId: farm.id } },
+        create: { buyerId: buyer.id, farmId: farm.id },
+        update: {},
+        include: withParticipants,
+      });
+      res.status(201).json(preview(convo, user.id));
+      return;
+    }
+
     if (user.role !== "BUYER") throw new HttpError(403, "Only a buyer can start a conversation");
-    const { farmId, cropId } = startBody.parse(req.body);
+    const { farmId, cropId } = body;
+    if (!farmId) throw new HttpError(400, "Choose a farm to message");
 
     const farm = await prisma.farm.findUnique({ where: { id: farmId } });
     if (!farm) throw new HttpError(404, "Farm not found");

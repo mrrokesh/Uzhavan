@@ -1,7 +1,7 @@
 import type { Role, User } from "@prisma/client";
 import type { Request } from "express";
 import { bearerToken, verifyToken } from "./auth.js";
-import { prisma } from "./db.js";
+import { cacheUser, getCachedUser, prisma } from "./db.js";
 import { env } from "./env.js";
 import { HttpError } from "./http.js";
 
@@ -14,8 +14,13 @@ export async function currentUser(req: Request): Promise<User> {
   const token = bearerToken(req);
   if (!token) throw new HttpError(401, "Sign in to continue");
   const userId = verifyToken(token);
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new HttpError(401, "Account not found");
+  let user = getCachedUser(userId);
+  if (!user) {
+    const row = await prisma.user.findUnique({ where: { id: userId } });
+    if (!row) throw new HttpError(401, "Account not found");
+    cacheUser(row);
+    user = row;
+  }
 
   if (user.status === "BLOCKED") {
     throw new HttpError(

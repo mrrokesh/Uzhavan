@@ -1,5 +1,5 @@
 import type { ImageSourcePropType } from "react-native";
-import { imageFor, imagesFor } from "../lib/images";
+import { cropImage, imageFor, imagesFor } from "../lib/images";
 
 export type Role = "BUYER" | "FARMER" | "DRIVER";
 
@@ -77,6 +77,8 @@ export type ApiCrop = {
   hasVideo: boolean;
   imageKey: string;
   galleryKeys: string[];
+  hasCustomPhoto?: boolean;
+  photoUpdatedAt?: string | null;
   listed: boolean;
   sellerVerified?: boolean;
   distanceKm?: number | null;
@@ -88,6 +90,8 @@ export type CropSearch = {
   origin: string | null;
   radiusKm: number | null;
   count: number;
+  /** True when another page can be fetched with a larger offset. */
+  hasMore?: boolean;
   crops: ApiCrop[];
 };
 
@@ -122,6 +126,7 @@ export type ApiTruck = {
   capacityKg: number;
   etaMin: number;
   price: number;
+  ratePerKm?: number;
   photoKey: string;
   recommended: boolean;
   body: string;
@@ -194,6 +199,7 @@ export type ApiBooking = {
   cancelReason: string | null;
   createdAt: string;
   paidAt: string | null;
+  approvedAt?: string | null;
   acceptedAt: string | null;
   arrivedAt: string | null;
   loadedAt: string | null;
@@ -286,6 +292,8 @@ export type Crop = {
   listed: boolean;
   imageKey: string;
   galleryKeys: string[];
+  hasCustomPhoto: boolean;
+  photoUpdatedAt: string | null;
   image: ImageSourcePropType;
   gallery: ImageSourcePropType[];
   avatar: ImageSourcePropType;
@@ -314,6 +322,7 @@ export type Truck = {
   capacityKg: number;
   etaMin: number;
   price: number;
+  ratePerKm: number;
   recommended: boolean;
   tooSmall: boolean;
   reason: string | null;
@@ -350,8 +359,12 @@ export function toCrop(c: ApiCrop): Crop {
     listed: c.listed,
     imageKey: c.imageKey,
     galleryKeys: c.galleryKeys,
-    image: imageFor(c.imageKey),
-    gallery: imagesFor(c.galleryKeys.length ? c.galleryKeys : [c.imageKey]),
+    hasCustomPhoto: Boolean(c.hasCustomPhoto),
+    photoUpdatedAt: c.photoUpdatedAt ?? null,
+    image: cropImage(c),
+    gallery: c.hasCustomPhoto
+      ? [cropImage(c), ...imagesFor(c.galleryKeys.length ? c.galleryKeys : [c.imageKey])]
+      : imagesFor(c.galleryKeys.length ? c.galleryKeys : [c.imageKey]),
     avatar: imageFor(c.farm.avatarKey),
     requestCount: c._count?.requests ?? 0,
     orderCount: c._count?.orders ?? 0,
@@ -382,6 +395,7 @@ export function toTruck(t: ApiTruck): Truck {
     capacityKg: t.capacityKg,
     etaMin: t.etaMin,
     price: t.price,
+    ratePerKm: t.ratePerKm ?? 0,
     recommended: t.recommended,
     tooSmall: t.tooSmall ?? false,
     reason: t.reason ?? null,
@@ -518,6 +532,9 @@ export type TicketCategory =
   | "ACCOUNT"
   | "VERIFICATION"
   | "APP_ISSUE"
+  | "COMPLAINT"
+  | "REFUND"
+  | "URGENT_CROP"
   | "OTHER";
 
 export type Ticket = {
@@ -582,6 +599,12 @@ export type DemandBoard = {
     acceptRate: number;
     /** True when this farm lists nothing in a category buyers are asking for. */
     gap: boolean;
+    buyers?: {
+      id: string;
+      name: string;
+      business: string | null;
+      district: string | null;
+    }[];
   }[];
   buyers: {
     id: string;

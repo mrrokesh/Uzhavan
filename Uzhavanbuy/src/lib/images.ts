@@ -1,4 +1,5 @@
 import type { ImageSourcePropType } from "react-native";
+import { API_BASE_URL } from "./api";
 
 /**
  * The API returns image *keys* (plain strings). The mobile app ships the actual
@@ -15,12 +16,6 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
   miniTruck: require("../../assets/images/minitruck.jpg"),
   lcv: require("../../assets/images/lcv.jpg"),
   warehouse: require("../../assets/images/warehouse.jpg"),
-  arul: require("../../assets/images/arul.jpg"),
-  muthu: require("../../assets/images/muthu.jpg"),
-  kannan: require("../../assets/images/kannan.jpg"),
-  selvam: require("../../assets/images/selvam.jpg"),
-  ramesh: require("../../assets/images/ramesh.jpg"),
-  buyer: require("../../assets/images/buyer.jpg"),
 };
 
 const FALLBACK = IMAGES.farm;
@@ -35,4 +30,19 @@ export function imageFor(key: string | null | undefined): ImageSourcePropType {
 export function imagesFor(keys: string[] | null | undefined): ImageSourcePropType[] {
   if (!keys?.length) return [FALLBACK];
   return keys.map(imageFor);
+}
+
+/** A picture the farmer added, or the stock photo for that key. */
+export function cropImage(crop: {
+  id: string;
+  imageKey: string;
+  hasCustomPhoto?: boolean;
+  photoUpdatedAt?: string | null;
+}): ImageSourcePropType {
+  if (crop.hasCustomPhoto) {
+    return {
+      uri: `${API_BASE_URL}/api/crops/${crop.id}/photo?v=${encodeURIComponent(crop.photoUpdatedAt ?? "")}`,
+    };
+  }
+  return imageFor(crop.imageKey);
 }

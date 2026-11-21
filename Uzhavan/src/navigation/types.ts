@@ -57,10 +57,21 @@ export type TabParamList = {
 
 export type FarmerStackParamList = SharedScreens & {
   FarmerTabs: undefined;
-  CropForm: { cropId?: string };
+  CropForm: { cropId?: string; prefill?: { title: string; category: string; pricePerKg?: string } };
   FarmerRequestDetail: { requestId: string };
   Demand: undefined;
+  BuyerDetail: {
+    id: string;
+    name: string;
+    business: string | null;
+    district: string | null;
+    market: string | null;
+    verified: boolean;
+    orders: number;
+    distanceKm: number | null;
+  };
   FarmerPayouts: undefined;
+  FarmProfile: undefined;
 };
 
 export type FarmerTabParamList = {

@@ -34,6 +34,13 @@ export type Overview = {
   unassignedTickets: number;
   orderCount: number;
   gmv: number;
+  verifiedFarmers?: number;
+  commission?: number;
+  commissionRate?: number;
+  bookings?: Partial<Record<string, number>>;
+  truckQueue?: number;
+  errorsToday?: number;
+  listedCrops?: number;
 };
 
 export type AccountRow = {

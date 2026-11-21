@@ -5,9 +5,9 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppHeader, Screen } from "../components/Chrome";
 import { SuccessMark } from "../components/Logo";
-import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
+import { Chip, Divider, InfoNote, PrimaryButton, Row } from "../components/ui";
 import { RouteStops } from "../components/Widgets";
-import { useConfirmRequest, useOrder, useRequest, useRequestAction, useSetTransport } from "../api/hooks";
+import { useConfirmRequest, useOrder, useRequest, useRequestAction, useSetTransport, useTrucks } from "../api/hooks";
 import { imageFor } from "../lib/images";
 import { ApiError } from "../lib/api";
 import { inr, kg } from "../lib/format";
@@ -77,7 +77,9 @@ export function ConfirmPurchase() {
             loading={working}
             onPress={submit}
           />
-          <OutlineButton label="Decline offer" tone="danger" onPress={declineOffer} />
+          <Pressable onPress={declineOffer} disabled={working}>
+            <Text style={styles.decline}>Decline offer</Text>
+          </Pressable>
           {error ? <Text style={styles.danger}>{error}</Text> : null}
         </>
       }
@@ -98,7 +100,7 @@ export function ConfirmPurchase() {
           <Divider />
           <Row label="Final price" value={`${inr(price)}/kg`} strong />
           <Divider />
-          <Row label="Goes to the farmer" value={inr(value)} />
+          <Row label="Order value" value={inr(value)} strong />
           <Divider />
           <Row label={`Platform fee (${feePercent}%)`} value={inr(fee)} />
           <Divider />
@@ -116,13 +118,13 @@ export function ConfirmPurchase() {
           <Text style={styles.confirm}>I confirm the quantity and final price.</Text>
         </Pressable>
 
-        <View style={{ marginTop: 16 }}>
-          <InfoNote>
-            <Ionicons name="shield-checkmark-outline" size={16} color={colors.forest} />
-            <Text style={{ flex: 1, color: colors.forest, fontSize: 12.5 }}>
-              Confirming reserves {kg(request.quantityKg)} from this listing. Transport is chosen next.
-            </Text>
-          </InfoNote>
+        <View style={styles.note}>
+          <Ionicons name="bus-outline" size={16} color={colors.forest} />
+          <Text style={styles.noteText}>Transport will be selected next. Payment instructions will appear in My Orders.</Text>
+        </View>
+        <View style={styles.note}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={colors.forest} />
+          <Text style={styles.noteText}>No payment will be collected now.</Text>
         </View>
       </ScrollView>
     </Screen>
@@ -152,7 +154,7 @@ export function QuantityConfirmed() {
   return (
     <Screen
       footer={
-        <PrimaryButton label="Continue to payment" onPress={go} loading={working} disabled={working} />
+        <PrimaryButton label="Continue" onPress={go} loading={working} disabled={working} />
       }
     >
       <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 24 }]}>
@@ -185,15 +187,18 @@ export function QuantityConfirmed() {
           onPress={() => setLocalTransport("BOOK")}
           title="Book a truck"
           rec
-          sub="Find verified local trucks near the farm."
+          sub="Find verified trucks near the farm and track delivery in Uzhavan."
         />
         <Radio
           selected={transport === "PRIVATE"}
           onPress={() => setLocalTransport("PRIVATE")}
           title="Use a private truck"
-          sub="Arrange your own vehicle for pickup."
+          sub="Add your vehicle and driver details for farm pickup."
         />
-        <Text style={styles.mutedCenter}>ⓘ You can change this later from My Orders.</Text>
+        <View style={styles.note}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
+          <Text style={styles.muted}>You can change this later from My Orders.</Text>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -203,7 +208,15 @@ export function BookTruckOrder() {
   const { orderId } = useRoute<RouteProp<RootStackParamList, "BookTruckOrder">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const order = useOrder(orderId).data;
+  const trucks = useTrucks(order?.quantityKg);
   const setTransport = useSetTransport();
+  const suggested =
+    (trucks.data ?? []).find((t) => t.recommended && !t.tooSmall) ?? (trucks.data ?? []).find((t) => !t.tooSmall);
+  const eta = suggested
+    ? suggested.etaMin >= 60
+      ? `${Math.floor(suggested.etaMin / 60)} hr ${suggested.etaMin % 60} min`
+      : `${suggested.etaMin} min`
+    : null;
 
   if (!order) {
     return (
@@ -237,7 +250,7 @@ export function BookTruckOrder() {
       <ScrollView contentContainerStyle={styles.pad}>
         <View style={styles.orderChip}>
           <Text style={styles.orderChipText}>
-            🚚 For order {order.code} · {order.product}
+            For order {order.code} · {order.product}
           </Text>
         </View>
 
@@ -254,15 +267,13 @@ export function BookTruckOrder() {
         </View>
 
         <View style={styles.suggest}>
-          <Image source={imageFor(order.crop?.imageKey)} style={styles.suggestImg} />
+          <Image source={suggested?.photo ?? imageFor("miniTruck")} style={styles.suggestImg} />
           <View style={{ padding: 12 }}>
-            <Text style={styles.muted}>YOUR LOAD</Text>
+            <Text style={styles.muted}>SUGGESTED VEHICLE</Text>
             <Text style={styles.farm}>
-              {order.product} · {kg(order.quantityKg)}
+              {suggested ? `${suggested.name} · Up to ${suggested.capacityTons} tons` : "Mini truck · Up to 2.5 tons"}
             </Text>
-          </View>
-          <View style={styles.suggestCheck}>
-            <Ionicons name="checkmark" size={13} color={colors.white} />
+            {eta ? <Text style={styles.muted}>Est. time {eta}</Text> : null}
           </View>
         </View>
 
@@ -294,7 +305,7 @@ function Radio({
 }) {
   return (
     <Pressable onPress={onPress} style={[styles.radio, selected && styles.radioOn]}>
-      <Text style={{ fontSize: 22 }}>{rec ? "🚚" : "🚛"}</Text>
+      <Ionicons name="bus-outline" size={20} color={colors.ink} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={styles.farm}>{title}</Text>
@@ -315,16 +326,19 @@ const styles = StyleSheet.create({
   list: { marginTop: 12, backgroundColor: colors.white, borderRadius: 16, paddingHorizontal: 16, ...shadow },
   muted: { fontSize: 12, color: colors.muted },
   checkRow: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12 },
-  box: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: "#cfc8bc", alignItems: "center", justifyContent: "center" },
+  box: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: "#D5D8D6", alignItems: "center", justifyContent: "center" },
   boxOn: { backgroundColor: colors.forest, borderColor: colors.forest },
   confirm: { fontSize: 13.5, fontWeight: "500", flex: 1 },
   danger: { marginTop: 12, textAlign: "center", color: colors.danger, fontSize: 12 },
+  decline: { textAlign: "center", paddingVertical: 10, fontSize: 15, fontWeight: "700", color: colors.danger },
+  note: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.mint, borderRadius: 14, padding: 14 },
+  noteText: { flex: 1, fontSize: 13, fontWeight: "600", color: colors.forest },
   h1: { marginTop: 12, fontSize: 22, fontWeight: "600" },
   sub: { marginTop: 6, fontSize: 13.5, color: colors.muted, textAlign: "center", maxWidth: 280 },
   section: { marginTop: 20, alignSelf: "flex-start", fontSize: 15, fontWeight: "600" },
   radio: { marginTop: 8, width: "100%", flexDirection: "row", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 14, borderWidth: 2, borderColor: "transparent", ...shadow },
   radioOn: { borderColor: colors.forest },
-  radioDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: "#cfc8bc", marginTop: 4 },
+  radioDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: "#D5D8D6", marginTop: 4 },
   mutedCenter: { marginTop: 12, fontSize: 12, color: colors.muted },
   farm: { fontSize: 14, fontWeight: "600", color: colors.ink },
   textLink: { textAlign: "center", paddingVertical: 8, fontSize: 14, fontWeight: "600", color: colors.forest },

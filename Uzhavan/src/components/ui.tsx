@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { revealInput } from "./keyboard";
 import { colors, shadow } from "../theme";
 
 export function Card({
@@ -60,10 +61,13 @@ export function Field({
   autoComplete,
   textContentType,
   multiline,
+  editable = true,
+  required,
+  error,
 }: {
   label: string;
   value: string;
-  onChangeText: (v: string) => void;
+  onChangeText?: (v: string) => void;
   placeholder?: string;
   secureTextEntry?: boolean;
   keyboardType?: KeyboardTypeOptions;
@@ -71,15 +75,28 @@ export function Field({
   autoComplete?: TextInputProps["autoComplete"];
   textContentType?: TextInputProps["textContentType"];
   multiline?: boolean;
+  editable?: boolean;
+  required?: boolean;
+  error?: string;
 }) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
+  const inputRef = useRef<TextInput>(null);
   return (
     <View style={styles.field}>
-      {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
-      <View style={[styles.fieldBox, multiline && styles.fieldBoxTall]}>
+      {label ? (
+        <Text style={styles.fieldLabel}>
+          {label}
+          {required ? <Text style={styles.required}> *</Text> : null}
+        </Text>
+      ) : null}
+      <View style={[styles.fieldBox, multiline && styles.fieldBoxTall, error ? styles.fieldBoxError : null]}>
         <TextInput
+          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
+          onFocus={() => {
+            setTimeout(() => revealInput(inputRef.current), 220);
+          }}
           placeholder={placeholder}
           placeholderTextColor={colors.faint}
           secureTextEntry={secureTextEntry ? hidden : false}
@@ -89,7 +106,10 @@ export function Field({
           textContentType={textContentType}
           autoCorrect={!secureTextEntry}
           multiline={multiline}
+          editable={editable}
           numberOfLines={multiline ? 4 : 1}
+          accessibilityLabel={label}
+          accessibilityHint={error}
           style={[styles.fieldInput, multiline && styles.fieldInputTall]}
         />
         {secureTextEntry ? (
@@ -98,6 +118,11 @@ export function Field({
           </Pressable>
         ) : null}
       </View>
+      {error ? (
+        <Text style={styles.fieldError} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -115,7 +140,7 @@ export function OutlineButton({
 }) {
   const color = tone === "danger" ? colors.danger : colors.forest;
   return (
-    <Pressable onPress={onPress} style={[styles.outline, { borderColor: tone === "danger" ? colors.danger : "#1B5E3B33" }]}>
+    <Pressable onPress={onPress} style={[styles.outline, { borderColor: tone === "danger" ? colors.danger : "#157A3233" }]}>
       {icon ? <Ionicons name={icon} size={16} color={color} /> : null}
       <Text style={[styles.outlineText, { color }]}>{label}</Text>
     </Pressable>
@@ -240,6 +265,8 @@ const styles = StyleSheet.create({
   note: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", gap: 10 },
   field: { gap: 6 },
   fieldLabel: { fontSize: 12, fontWeight: "600", color: colors.muted },
+  required: { color: colors.danger },
+  fieldError: { fontSize: 12, lineHeight: 16, color: colors.danger },
   fieldBox: {
     minHeight: 50,
     borderRadius: 12,
@@ -248,8 +275,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
     ...shadow,
   },
+  fieldBoxError: { borderColor: colors.danger },
   fieldInput: { flex: 1, fontSize: 15, color: colors.ink, paddingVertical: 12 },
   fieldBoxTall: { alignItems: "flex-start", minHeight: 104 },
   fieldInputTall: { minHeight: 84, textAlignVertical: "top" },

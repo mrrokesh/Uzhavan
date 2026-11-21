@@ -342,15 +342,26 @@ verificationRouter.post(
       throw new HttpError(400, "Give a reason so they know what to fix");
     }
 
-    const updated = await prisma.user.update({
-      where: { id: target.id },
-      data: {
-        verification: decision,
-        verificationReviewedAt: new Date(),
-        verificationReviewedById: reviewer.id,
-        rejectionReason: decision === "REJECTED" ? reason : null,
-      },
-      select: { id: true, name: true, verification: true, rejectionReason: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      if (target.role === "DRIVER") {
+        await tx.driver.updateMany({
+          where: { userId: target.id },
+          data:
+            decision === "VERIFIED"
+              ? { verified: true }
+              : { verified: false, online: false },
+        });
+      }
+      return tx.user.update({
+        where: { id: target.id },
+        data: {
+          verification: decision,
+          verificationReviewedAt: new Date(),
+          verificationReviewedById: reviewer.id,
+          rejectionReason: decision === "REJECTED" ? reason : null,
+        },
+        select: { id: true, name: true, verification: true, rejectionReason: true },
+      });
     });
 
     await audit({

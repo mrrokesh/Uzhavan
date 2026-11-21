@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLeaveReview, useReviewable } from "../api/hooks";
+import { revealInput } from "./keyboard";
 import { ApiError } from "../lib/api";
 import { colors, shadow } from "../theme";
 import type { ReviewableSubject } from "../api/types";
@@ -41,6 +42,7 @@ function RateCard({ orderId, subject }: { orderId: string; subject: ReviewableSu
   const leave = useLeaveReview(orderId);
   const [stars, setStars] = useState(subject.existing?.stars ?? 0);
   const [comment, setComment] = useState(subject.existing?.comment ?? "");
+  const inputRef = useRef<TextInput>(null);
   const [open, setOpen] = useState(!subject.existing);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -101,8 +103,10 @@ function RateCard({ orderId, subject }: { orderId: string; subject: ReviewableSu
       </View>
 
       <TextInput
+        ref={inputRef}
         value={comment}
         onChangeText={setComment}
+        onFocus={() => setTimeout(() => revealInput(inputRef.current), 220)}
         placeholder="Anything worth saying? (optional)"
         placeholderTextColor={colors.faint}
         style={styles.input}

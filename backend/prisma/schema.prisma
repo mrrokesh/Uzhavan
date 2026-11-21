@@ -155,6 +155,9 @@ enum TicketCategory {
   ACCOUNT
   VERIFICATION
   APP_ISSUE
+  COMPLAINT
+  REFUND
+  URGENT_CROP
   OTHER
 }
 
@@ -780,6 +783,10 @@ model Farm {
   rating        Float          @default(5)
   ratingCount   Int            @default(0)
   avatarKey     String         @default("arul")
+  /// A picture the farmer took of themselves. Served from FarmAvatar.
+  hasAvatar       Boolean        @default(false)
+  avatarUpdatedAt DateTime?
+  avatar          FarmAvatar?
   crops         Crop[]
   conversations Conversation[]
   createdAt     DateTime       @default(now())
@@ -808,6 +815,10 @@ model Crop {
   hasVideo         Boolean    @default(false)
   imageKey         String
   galleryKeys      String[]
+  /// A picture the farmer took, served from CropPhoto. Stock imageKey stays as the fallback.
+  hasCustomPhoto   Boolean    @default(false)
+  photoUpdatedAt   DateTime?
+  photo            CropPhoto?
   /// Farmer can unlist without deleting history.
   listed           Boolean    @default(true)
 
@@ -819,6 +830,26 @@ model Crop {
   /// deleting the crop must not take a conversation's history with it.
   conversations Conversation[]
   createdAt     DateTime       @default(now())
+
+  @@index([listed, status])
+  @@index([farmId])
+  @@index([createdAt])
+}
+
+/// The farmer's profile picture. Kept off the farm row so lists don't ship the bytes.
+model FarmAvatar {
+  farmId   String @id
+  farm     Farm   @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  mimeType String
+  data     Bytes
+}
+
+/// The farmer's own picture for a listing. Kept off the crop row so feeds don't ship the bytes.
+model CropPhoto {
+  cropId   String @id
+  crop     Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  mimeType String
+  data     Bytes
 }
 
 model Driver {
@@ -836,6 +867,7 @@ model Driver {
 
   truck    Truck?
   bookings TruckBooking[]
+  passes   DriverPass[]
 }
 
 model Truck {
@@ -852,6 +884,9 @@ model Truck {
   recommended  Boolean @default(false)
   body         String
   plate        String
+  /// What the driver charges per kilometre. The trip fare is the higher of
+  /// this times the distance and the standard fare in `price`.
+  ratePerKm    Int     @default(0)
   /// Plate with spaces and hyphens stripped, uppercased. People type
   /// "TN30AB4821", "tn 30 ab 4821" and "TN-30-AB-4821" for the same vehicle,
   /// so searches run against this rather than the display form.
@@ -877,6 +912,7 @@ model Follow {
   cropId String
 
   @@unique([userId, cropId])
+  @@index([cropId])
 }
 
 model SavedCrop {
@@ -887,6 +923,7 @@ model SavedCrop {
   cropId String
 
   @@unique([userId, cropId])
+  @@index([cropId])
 }
 
 model CropRequest {
@@ -906,6 +943,9 @@ model CropRequest {
   createdAt       DateTime      @default(now())
   respondedAt     DateTime?
   confirmedAt     DateTime?
+
+  @@index([buyerId, createdAt])
+  @@index([cropId, status])
 }
 
 model Order {
@@ -940,17 +980,22 @@ model Order {
   createdAt    DateTime        @default(now())
   payouts      Payout[]
   reviews      Review[]
+
+  @@index([buyerId, createdAt])
+  @@index([cropId])
 }
 
 model TruckBooking {
   id       String @id @default(cuid())
   code     String @unique
-  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId  String @unique
-  truck    Truck  @relation(fields: [truckId], references: [id])
-  truckId  String
-  driver   Driver @relation(fields: [driverId], references: [id])
-  driverId String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId  String  @unique
+  /// Empty once every offered driver has passed. Any online driver who can
+  /// carry the load may then take it.
+  truck    Truck?  @relation(fields: [truckId], references: [id])
+  truckId  String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+  driverId String?
 
   pickup        String
   destination   String
@@ -967,6 +1012,9 @@ model TruckBooking {
 
   createdAt   DateTime  @default(now())
   paidAt      DateTime?
+  /// Staff must approve a paid truck booking before a driver can take it.
+  approvedAt   DateTime?
+  approvedById String?
   acceptedAt  DateTime?
   arrivedAt   DateTime?
   loadedAt    DateTime?
@@ -974,6 +1022,38 @@ model TruckBooking {
   deliveredAt DateTime?
 
   events BookingEvent[]
+  passes DriverPass[]
+
+  @@index([driverId, status])
+  @@index([truckId])
+  @@index([status, approvedAt])
+}
+
+/// A failure reported by one of the phone apps.
+model ClientReport {
+  id        String    @id @default(cuid())
+  app       AppKind
+  platform  Platform
+  message   String
+  path      String?
+  status    Int?
+  userId    String?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([app, platform])
+}
+
+/// A driver looked at a paid trip and passed. It is not offered to them again.
+model DriverPass {
+  id        String       @id @default(cuid())
+  driver    Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId  String
+  booking   TruckBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String
+  createdAt DateTime     @default(now())
+
+  @@unique([driverId, bookingId])
 }
 
 /// Append-only trip timeline the buyer's tracking screen renders.

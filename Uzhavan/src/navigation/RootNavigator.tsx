@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Logo } from "../components/Logo";
 import { AppProvider } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n";
+import { biometricChoice, fingerprintAvailable, type BiometricChoice } from "../lib/biometric";
+import { LanguagePick } from "../screens/LanguagePick";
+import { BiometricLock, EnableFingerprint } from "../screens/BiometricGate";
 
 import { ChooseRole, CreateAccount, Login } from "../screens/Auth";
 import { WrongApp } from "../screens/WrongApp";
@@ -38,7 +42,9 @@ import { CropForm } from "../screens/farmer/CropForm";
 import { FarmerRequests } from "../screens/farmer/Requests";
 import { FarmerRequestDetail } from "../screens/farmer/RequestDetail";
 import { FarmerAccount } from "../screens/farmer/FarmerAccount";
+import { FarmProfile } from "../screens/farmer/FarmProfile";
 import { Demand } from "../screens/farmer/Demand";
+import { BuyerDetail } from "../screens/farmer/BuyerDetail";
 import { FarmerPayouts } from "../screens/farmer/Payouts";
 
 // Driver
@@ -197,26 +203,31 @@ function BuyerApp() {
 // ---- Farmer ----------------------------------------------------------------
 
 function FarmerTabs() {
+  const { t } = useI18n();
   return (
     <FarmerTab.Navigator
       screenOptions={tabOptions({
         FarmerHome: ["home", "home-outline"],
-        Listings: ["leaf", "leaf-outline"],
+        Listings: ["grid", "grid-outline"],
         Requests: ["mail", "mail-outline"],
         FarmerAccount: ["person", "person-outline"],
       })}
     >
-      <FarmerTab.Screen name="FarmerHome" component={FarmerHome} options={{ title: "Home" }} />
-      <FarmerTab.Screen name="Listings" component={Listings} options={{ title: "My Crops" }} />
-      <FarmerTab.Screen name="Requests" component={FarmerRequests} />
-      <FarmerTab.Screen name="FarmerAccount" component={FarmerAccount} options={{ title: "Profile" }} />
+      <FarmerTab.Screen name="FarmerHome" component={FarmerHome} options={{ title: t("tabs.home") }} />
+      <FarmerTab.Screen name="Listings" component={Listings} options={{ title: t("tabs.crops") }} />
+      <FarmerTab.Screen name="Requests" component={FarmerRequests} options={{ title: t("tabs.requests") }} />
+      <FarmerTab.Screen name="FarmerAccount" component={FarmerAccount} options={{ title: t("tabs.profile") }} />
     </FarmerTab.Navigator>
   );
 }
 
 function FarmerApp() {
+  const { justSignedUp } = useAuth();
   return (
-    <FarmerStack.Navigator screenOptions={stackOptions}>
+    <FarmerStack.Navigator
+      initialRouteName={justSignedUp ? "Verification" : "FarmerTabs"}
+      screenOptions={stackOptions}
+    >
       <FarmerStack.Screen name="FarmerTabs" component={FarmerTabs} />
       <FarmerStack.Screen name="CropForm" component={CropForm} />
       <FarmerStack.Screen name="FarmerRequestDetail" component={FarmerRequestDetail} />
@@ -228,7 +239,9 @@ function FarmerApp() {
       <FarmerStack.Screen name="Announcements" component={Announcements} />
       <FarmerStack.Screen name="Notifications" component={Notifications} />
       <FarmerStack.Screen name="Demand" component={Demand} />
+      <FarmerStack.Screen name="BuyerDetail" component={BuyerDetail} />
       <FarmerStack.Screen name="FarmerPayouts" component={FarmerPayouts} />
+      <FarmerStack.Screen name="FarmProfile" component={FarmProfile} />
       <FarmerStack.Screen name="Messages" component={Messages} />
       <FarmerStack.Screen name="ChatThread" component={ChatThread} />
       <FarmerStack.Screen name="Assistant" component={Assistant} />
@@ -255,8 +268,12 @@ function DriverTabs() {
 }
 
 function DriverApp() {
+  const { justSignedUp } = useAuth();
   return (
-    <DriverStack.Navigator screenOptions={stackOptions}>
+    <DriverStack.Navigator
+      initialRouteName={justSignedUp ? "Verification" : "DriverTabs"}
+      screenOptions={stackOptions}
+    >
       <DriverStack.Screen name="DriverTabs" component={DriverTabs} />
       <DriverStack.Screen name="TripDetail" component={TripDetail} />
       <DriverStack.Screen name="Verification" component={Verification} />
@@ -292,29 +309,75 @@ function BootSplash() {
   );
 }
 
+function useAppLock(hasSession: boolean) {
+  const [checking, setChecking] = useState(true);
+  const [choice, setChoice] = useState<BiometricChoice>(null);
+  const [available, setAvailable] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all([biometricChoice(), fingerprintAvailable()])
+      .then(([saved, hardware]) => {
+        if (!live) return;
+        setChoice(saved);
+        setAvailable(hardware);
+      })
+      .finally(() => {
+        if (live) setChecking(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasSession) setUnlocked(false);
+  }, [hasSession]);
+
+  return {
+    checking,
+    askToEnable: available && choice === null,
+    locked: hasSession && choice === "on" && !unlocked,
+    unlock: () => setUnlocked(true),
+    refresh: () => {
+      setUnlocked(true);
+      void biometricChoice().then(setChoice);
+    },
+  };
+}
+
 export function RootNavigator() {
-  const { ready, offline, token, role } = useAuth();
+  const { ready: languageReady, language } = useI18n();
+  const { ready, offline, token, role, signOut } = useAuth();
+  const lock = useAppLock(Boolean(token));
   useNotificationRouting();
+
+  const gate = !languageReady || !ready || lock.checking ? (
+    <BootSplash />
+  ) : !language ? (
+    <LanguagePick />
+  ) : lock.askToEnable ? (
+    <EnableFingerprint onDone={lock.refresh} />
+  ) : offline ? (
+    <Reconnect />
+  ) : lock.locked ? (
+    <BiometricLock onUnlock={lock.unlock} onPassword={() => void signOut()} />
+  ) : !token ? (
+    <AuthStack />
+  ) : !servesRole(role) ? (
+    <WrongApp />
+  ) : role === "FARMER" ? (
+    <FarmerApp />
+  ) : role === "DRIVER" ? (
+    <DriverApp />
+  ) : (
+    <BuyerApp />
+  );
 
   return (
     <NavigationContainer theme={theme} ref={navigationRef}>
-      {!ready ? (
-        <BootSplash />
-      ) : offline ? (
-        // Saved session we couldn't confirm. Not a logout — offer a retry.
-        <Reconnect />
-      ) : !token ? (
-        <AuthStack />
-      ) : !servesRole(role) ? (
-        // A valid account, but for the other app — or for the web console.
-        <WrongApp />
-      ) : role === "FARMER" ? (
-        <FarmerApp />
-      ) : role === "DRIVER" ? (
-        <DriverApp />
-      ) : (
-        <BuyerApp />
-      )}
+      {gate}
     </NavigationContainer>
   );
 }

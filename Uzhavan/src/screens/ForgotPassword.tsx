@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { AppHeader, Screen } from "../components/Chrome";
@@ -8,6 +8,7 @@ import { useForgotPassword, useResetPassword } from "../api/hooks";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
 import { colors } from "../theme";
+import { FormScroll } from "../components/keyboard";
 
 /**
  * Two steps on one screen: ask for a code, then use it.
@@ -77,7 +78,7 @@ export function ForgotPassword() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           step === "ask" ? (
@@ -99,7 +100,7 @@ export function ForgotPassword() {
         }
       >
         <AppHeader title="Forgot password" />
-        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+        <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           {step === "ask" ? (
             <>
               <Text style={styles.h1}>Can’t get in?</Text>
@@ -163,7 +164,7 @@ export function ForgotPassword() {
           )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+        </FormScroll>
       </Screen>
     </KeyboardAvoidingView>
   );

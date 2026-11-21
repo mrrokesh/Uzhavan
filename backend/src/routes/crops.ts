@@ -89,7 +89,27 @@ cropsRouter.get(
   }),
 );
 
+/** Category names the filter chips offer — a cheap DISTINCT instead of fetching every listing. */
+cropsRouter.get(
+  "/categories",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.crop.groupBy({
+      by: ["category"],
+      where: { listed: true, farm: { owner: { status: "ACTIVE" } } },
+    });
+    res.json(
+      rows
+        .map((r) => r.category)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    );
+  }),
+);
+
 const listQuery = z.object({
+  /** Page size. Capped so one request can never ship the whole catalogue. */
+  limit: z.coerce.number().int().min(1).max(100).default(40),
+  offset: z.coerce.number().int().min(0).default(0),
   status: z.enum(["upcoming", "ready"]).optional(),
   following: z.coerce.boolean().optional(),
   q: z.string().trim().optional(),
@@ -161,6 +181,9 @@ cropsRouter.get(
           : p.sort === "priceHigh"
             ? { pricePerKg: "desc" }
             : { createdAt: "desc" },
+      // Distance is not a column, so that sort needs the whole matching set
+      // before it can be cut into pages. Every other sort pages in SQL.
+      ...(p.sort === "distance" ? {} : { skip: p.offset, take: p.limit + 1 }),
     });
 
     // Attach distance and the seller's verified flag, then sort by distance
@@ -179,12 +202,33 @@ cropsRouter.get(
       decorated.sort((a, b) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9));
     }
 
+    // One extra row was fetched (or, for distance, the full set) to learn
+    // whether another page exists without a separate COUNT query.
+    const page =
+      p.sort === "distance"
+        ? decorated.slice(p.offset, p.offset + p.limit)
+        : decorated.slice(0, p.limit);
+    const hasMore =
+      p.sort === "distance" ? decorated.length > p.offset + p.limit : decorated.length > p.limit;
+
     res.json({
       origin: origin?.name ?? null,
       radiusKm: p.radiusKm ?? null,
-      count: decorated.length,
-      crops: decorated,
+      count: page.length,
+      hasMore,
+      crops: page,
     });
+  }),
+);
+
+cropsRouter.get(
+  "/:id/photo",
+  asyncHandler(async (req, res) => {
+    const photo = await prisma.cropPhoto.findUnique({ where: { cropId: String(req.params.id) } });
+    if (!photo) throw new HttpError(404, "No photo");
+    res.setHeader("Content-Type", photo.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(Buffer.from(photo.data));
   }),
 );
 

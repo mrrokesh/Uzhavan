@@ -1,165 +1,164 @@
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { NavigationProp } from "@react-navigation/native";
 import { Screen } from "../../components/Chrome";
 import { Logo } from "../../components/Logo";
-import { Chip } from "../../components/ui";
-import { NotificationBell } from "../../components/NotificationBell";
-import { useFarmerOrders, useFarmerSummary } from "../../api/hooks";
+import { useFarmerCrops, useFarmerRequests, useFarmerSummary } from "../../api/hooks";
+import { useAuth } from "../../context/AuthContext";
+import { FarmerAvatar } from "../../components/FarmerAvatar";
 import { imageFor } from "../../lib/images";
 import { inr, kg } from "../../lib/format";
-import type { FarmerStackParamList } from "../../navigation/types";
+import type { FarmerStackParamList, FarmerTabParamList } from "../../navigation/types";
+import { useI18n } from "../../i18n";
 import { colors, shadow } from "../../theme";
 
 export function FarmerHome() {
-  const navigation = useNavigation<NativeStackNavigationProp<FarmerStackParamList>>();
+  const navigation = useNavigation<NavigationProp<FarmerTabParamList & FarmerStackParamList>>();
+  const { t, language } = useI18n();
+  const { user } = useAuth();
   const summary = useFarmerSummary();
-  const orders = useFarmerOrders();
-
-  if (summary.isLoading) {
-    return (
-      <Screen>
-        <ActivityIndicator color={colors.forest} style={{ marginTop: 64 }} />
-      </Screen>
-    );
-  }
-
-  const s = summary.data;
-  const recent = (orders.data ?? []).slice(0, 3);
+  const crops = useFarmerCrops();
+  const requests = useFarmerRequests();
+  const farm = summary.data?.farm;
+  const first = (user?.name ?? "farmer").split(" ")[0];
+  const listed = crops.data ?? [];
+  const expectedKg = listed.reduce((sum, c) => sum + c.expectedKg, 0);
+  const expectedValue = listed.reduce((sum, c) => sum + c.expectedKg * c.pricePerKg, 0);
+  const pending = (requests.data ?? []).filter((r) => r.status === "PENDING");
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.pad}>
         <View style={styles.top}>
-          <Logo />
-          <NotificationBell />
+          <Logo compact />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Pressable onPress={() => navigation.navigate("Help")} accessibilityLabel="Support" hitSlop={8}>
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.ink} />
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate("Notifications")} accessibilityLabel="Notifications" hitSlop={8}>
+              <Ionicons name="notifications-outline" size={22} color={colors.ink} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.hello}>
+          <FarmerAvatar farm={farm} size={44} />
+          <View>
+            <Text style={styles.helloTitle}>{language === "ta" ? "வணக்கம்" : "Vanakkam"}, {first}</Text>
+            <Text style={styles.verified}>
+              {user?.verification === "VERIFIED" ? (
+                <>
+                  {t("home.verified")} <Text style={{ color: colors.blueTick }}>✓</Text>
+                </>
+              ) : user?.verification === "PENDING" ? (
+                "Papers under review"
+              ) : (
+                "Not verified yet"
+              )}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.hero}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.h1}>{s?.farm.name ?? "Your farm"}</Text>
-            <Text style={styles.muted}>{s?.farm.location}</Text>
+          <Image source={imageFor("farm")} style={styles.heroImg} />
+          <View style={styles.heroShade} />
+          <View style={styles.heroText}>
+            <Text style={styles.heroKicker}>{t("home.season")}</Text>
+            <View style={styles.heroStats}>
+              <View>
+                <Text style={styles.heroNum}>{summary.data?.listedCrops ?? listed.length}</Text>
+                <Text style={styles.heroLabel}>{t("home.active")}</Text>
+              </View>
+              <View>
+                <Text style={styles.heroNum}>{kg(expectedKg).replace(" kg", "")}</Text>
+                <Text style={styles.heroLabel}>{t("home.kg")}</Text>
+              </View>
+            </View>
           </View>
-          <Image source={imageFor(s?.farm.avatarKey)} style={styles.avatar} />
         </View>
 
-        {s && s.pendingRequests > 0 ? (
-          <Pressable style={styles.alert} onPress={() => navigation.navigate("FarmerTabs")}>
-            <View style={styles.alertIcon}>
-              <Ionicons name="mail-unread-outline" size={18} color={colors.amberText} />
-            </View>
+        <Pressable style={styles.add} onPress={() => navigation.navigate("CropForm", {})}>
+          <Ionicons name="add" size={18} color={colors.white} />
+          <Text style={styles.addText}>{t("home.add")}</Text>
+        </Pressable>
+
+        <View style={styles.tiles}>
+          <Tile n={String(pending.length)} label={t("home.requests")} onPress={() => navigation.navigate("Requests")} />
+          <Tile n={String(summary.data?.orderCount ?? 0)} label={t("home.confirmed")} />
+          <Tile n={inr(expectedValue)} label={t("home.expected")} />
+        </View>
+
+        <View style={styles.sectionRow}>
+          <Text style={styles.section}>{t("home.harvests")}</Text>
+          <Text style={styles.link}>{t("home.viewAll")}</Text>
+        </View>
+        {listed.map((crop) => (
+          <Pressable key={crop.id} style={styles.crop} onPress={() => navigation.navigate("CropForm", { cropId: crop.id })}>
+            <Image source={crop.image} style={styles.cropImg} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.alertTitle}>
-                {s.pendingRequests} buyer {s.pendingRequests === 1 ? "request" : "requests"} waiting
-              </Text>
-              <Text style={styles.alertSub}>Open the Requests tab to set your final price.</Text>
+              <Text style={styles.cropTitle}>{crop.title}</Text>
+              <View style={styles.ready}>
+                <Text style={styles.readyText}>{crop.status === "ready" ? t("home.ready") : t("home.upcoming")}</Text>
+              </View>
+              <Text style={styles.muted}>{kg(crop.expectedKg)}</Text>
+              <Text style={styles.muted}>{crop.location}</Text>
             </View>
           </Pressable>
-        ) : null}
-
-        <View style={styles.stats}>
-          <Stat n={String(s?.listedCrops ?? 0)} l="Listed crops" />
-          <Stat n={String(s?.awaitingBuyer ?? 0)} l="Awaiting buyer" />
-        </View>
-        <View style={styles.stats}>
-          <Stat n={String(s?.orderCount ?? 0)} l="Orders" />
-          <Stat n={inr(s?.salesValue ?? 0)} l="Sales value" />
-        </View>
-
-        <Pressable style={styles.cta} onPress={() => navigation.navigate("CropForm", {})}>
-          <Ionicons name="add-circle-outline" size={20} color={colors.white} />
-          <Text style={styles.ctaText}>List a new crop</Text>
-        </Pressable>
-
-        <Pressable style={styles.demand} onPress={() => navigation.navigate("FarmerPayouts")}>
-          <View style={styles.demandIcon}>
-            <Ionicons name="wallet-outline" size={18} color={colors.forest} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.demandTitle}>Your money</Text>
-            <Text style={styles.demandSub}>
-              What buyers have paid, and when each part reaches your bank.
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.faint} />
-        </Pressable>
-
-        <Pressable style={styles.demand} onPress={() => navigation.navigate("Demand")}>
-          <View style={styles.demandIcon}>
-            <Ionicons name="trending-up-outline" size={18} color={colors.forest} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.demandTitle}>What buyers want</Text>
-            <Text style={styles.demandSub}>
-              Which crops buyers near you are asking for, and what they pay.
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.faint} />
-        </Pressable>
-
-        <Text style={styles.sectionTitle}>Recent orders</Text>
-        {orders.isLoading ? <ActivityIndicator color={colors.forest} style={{ marginTop: 16 }} /> : null}
-        {!orders.isLoading && recent.length === 0 ? (
-          <Text style={styles.empty}>No orders yet. List a crop and buyers will find you.</Text>
-        ) : null}
-        {recent.map((o) => (
-          <View key={o.id} style={styles.orderCard}>
-            <Image source={imageFor(o.crop?.imageKey)} style={styles.orderImg} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.between}>
-                <Text style={styles.orderTitle}>{o.product}</Text>
-                <Chip
-                  label={o.status === "DELIVERED" ? "Delivered" : o.booking ? "In transit" : "Awaiting truck"}
-                  tone={o.status === "DELIVERED" ? "mint" : "amber"}
-                />
-              </View>
-              <Text style={styles.muted}>
-                {kg(o.quantityKg)} · {o.buyer?.business ?? o.buyer?.name}
-              </Text>
-              <Text style={styles.green}>{inr(o.value)}</Text>
-            </View>
-          </View>
         ))}
+
+        {pending.length > 0 ? (
+          <Pressable style={styles.banner} onPress={() => navigation.navigate("Requests")}>
+            <Text style={styles.bannerText}>
+              {pending.length} {pending.length === 1 ? t("home.interestedOne") : t("home.interestedMany")}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.forest} />
+          </Pressable>
+        ) : null}
       </ScrollView>
     </Screen>
   );
 }
 
-function Stat({ n, l }: { n: string; l: string }) {
+function Tile({ n, label, onPress }: { n: string; label: string; onPress?: () => void }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statN}>{n}</Text>
-      <Text style={styles.muted}>{l}</Text>
-    </View>
+    <Pressable style={styles.tile} onPress={onPress}>
+      <Text style={styles.tileN} numberOfLines={1}>{n}</Text>
+      <Text style={styles.tileL}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  pad: { paddingHorizontal: 16, paddingBottom: 32 },
-  top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  hero: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12 },
-  h1: { fontSize: 22, fontWeight: "700", color: colors.ink },
-  avatar: { width: 56, height: 56, borderRadius: 28 },
-  muted: { fontSize: 12.5, color: colors.muted },
-  alert: { marginTop: 16, flexDirection: "row", gap: 12, alignItems: "center", backgroundColor: colors.amberBg, borderRadius: 16, padding: 14 },
-  alertIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
-  alertTitle: { fontSize: 14, fontWeight: "600", color: colors.amberText },
-  alertSub: { marginTop: 2, fontSize: 12, color: colors.amberText },
-  stats: { marginTop: 12, flexDirection: "row", gap: 8 },
-  stat: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 14, alignItems: "center", ...shadow },
-  statN: { fontSize: 19, fontWeight: "700", color: colors.forest },
-  cta: { marginTop: 20, height: 52, borderRadius: 12, backgroundColor: colors.forest, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  demand: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
-  demandIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center" },
-  demandTitle: { fontSize: 14.5, fontWeight: "600", color: colors.ink },
-  demandSub: { marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.muted },
-  ctaText: { color: colors.white, fontSize: 15, fontWeight: "600" },
-  sectionTitle: { marginTop: 28, fontSize: 15, fontWeight: "600", color: colors.ink },
-  empty: { marginTop: 16, fontSize: 13, color: colors.muted },
-  orderCard: { marginTop: 12, flexDirection: "row", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, ...shadow },
-  orderImg: { width: 56, height: 56, borderRadius: 12 },
-  orderTitle: { fontSize: 14.5, fontWeight: "600", color: colors.ink },
-  between: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
-  green: { marginTop: 4, fontSize: 13.5, fontWeight: "700", color: colors.forest },
+  pad: { paddingHorizontal: 16, paddingBottom: 28 },
+  top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  hello: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
+  avatar: { width: 46, height: 46, borderRadius: 23 },
+  helloTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  verified: { fontSize: 12.5, color: colors.forest, marginTop: 2 },
+  hero: { marginTop: 16, height: 148, borderRadius: 18, overflow: "hidden" },
+  heroImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
+  heroShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(12,40,24,0.45)" },
+  heroText: { flex: 1, justifyContent: "flex-end", padding: 16 },
+  heroKicker: { color: "rgba(255,255,255,0.85)", fontSize: 13 },
+  heroStats: { flexDirection: "row", gap: 28, marginTop: 6 },
+  heroNum: { color: colors.white, fontSize: 26, fontWeight: "800" },
+  heroLabel: { color: "rgba(255,255,255,0.85)", fontSize: 12 },
+  add: { marginTop: 12, height: 48, borderRadius: 14, backgroundColor: colors.forest, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  addText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  tiles: { flexDirection: "row", gap: 8, marginTop: 14 },
+  tile: { flex: 1, backgroundColor: colors.white, borderRadius: 14, padding: 12, ...shadow },
+  tileN: { fontSize: 16, fontWeight: "800", color: colors.ink },
+  tileL: { marginTop: 4, fontSize: 11, color: colors.muted },
+  sectionRow: { marginTop: 22, marginBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  section: { fontSize: 16, fontWeight: "700", color: colors.ink },
+  link: { fontSize: 13, color: colors.forest, fontWeight: "600" },
+  crop: { flexDirection: "row", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, marginBottom: 10, ...shadow },
+  cropImg: { width: 72, height: 72, borderRadius: 12 },
+  cropTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  ready: { alignSelf: "flex-start", marginTop: 4, backgroundColor: colors.amberBg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  readyText: { fontSize: 11, color: colors.amberText, fontWeight: "600" },
+  muted: { marginTop: 3, fontSize: 12.5, color: colors.muted },
+  banner: { marginTop: 6, backgroundColor: colors.mint, borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 8 },
+  bannerText: { flex: 1, color: colors.forest, fontWeight: "600", fontSize: 13.5 },
 });

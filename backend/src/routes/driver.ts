@@ -26,7 +26,7 @@ const ACTIVE: BookingStatus[] = ["ACCEPTED", "ARRIVED_PICKUP", "LOADED", "IN_TRA
 driverRouter.get(
   "/summary",
   asyncHandler(async (req, res) => {
-    const { driver } = await requireDriver(req);
+    const { user, driver } = await requireDriver(req);
     const [active, completed, paidTrips] = await Promise.all([
       prisma.truckBooking.count({ where: { driverId: driver.id, status: { in: ACTIVE } } }),
       prisma.truckBooking.count({ where: { driverId: driver.id, status: "DELIVERED" } }),
@@ -38,6 +38,7 @@ driverRouter.get(
     res.json({
       driver,
       truck: driver.truck,
+      papers: user.verification,
       activeTrips: active,
       completedTrips: completed,
       earnings: paidTrips.reduce((sum, b) => sum + b.total, 0),
@@ -50,8 +51,11 @@ const onlineBody = z.object({ online: z.boolean() });
 driverRouter.patch(
   "/availability",
   asyncHandler(async (req, res) => {
-    const { driver } = await requireDriver(req);
+    const { user, driver } = await requireDriver(req);
     const { online } = onlineBody.parse(req.body);
+    if (online && !driver.verified && user.verification !== "VERIFIED") {
+      throw new HttpError(403, "Submit your licence and vehicle papers, and wait until they are approved, before going online.");
+    }
     res.json(await prisma.driver.update({ where: { id: driver.id }, data: { online } }));
   }),
 );
@@ -63,9 +67,25 @@ driverRouter.patch(
 driverRouter.get(
   "/jobs",
   asyncHandler(async (req, res) => {
-    const { driver } = await requireDriver(req);
+    const { user, driver } = await requireDriver(req);
+    if (!driver.online || !driver.truck || (!driver.verified && user.verification !== "VERIFIED")) {
+      res.json([]);
+      return;
+    }
+    const passed = await prisma.driverPass.findMany({
+      where: { driverId: driver.id },
+      select: { bookingId: true },
+    });
     const jobs = await prisma.truckBooking.findMany({
-      where: { driverId: driver.id, status: "PAID" },
+      where: {
+        status: "PAID",
+        approvedAt: { not: null },
+        ...(passed.length ? { id: { notIn: passed.map((p) => p.bookingId) } } : {}),
+        OR: [
+          { driverId: driver.id },
+          { driverId: null, order: { quantityKg: { lte: driver.truck.capacityKg } } },
+        ],
+      },
       include: tripInclude,
       orderBy: { createdAt: "asc" },
     });
@@ -127,8 +147,23 @@ driverRouter.post(
 
     const booking = await prisma.truckBooking.findUnique({
       where: { id: String(req.params.id) },
+      include: { order: true },
     });
-    if (!booking || booking.driverId !== driver.id) throw new HttpError(404, "Trip not found");
+    if (!booking || (booking.driverId && booking.driverId !== driver.id)) {
+      throw new HttpError(404, "Trip not found");
+    }
+    if (booking.status === "PAID" && !booking.approvedAt) {
+      throw new HttpError(403, "This truck booking is waiting for approval");
+    }
+    if (!booking.driverId && booking.status === "PAID") {
+      if (!driver.truck) throw new HttpError(409, "Register a truck before taking a trip");
+      if (!driver.verified && driverUser.verification !== "VERIFIED") {
+        throw new HttpError(403, "Your documents have to be approved before you can take a trip");
+      }
+      if (driver.truck.capacityKg < booking.order.quantityKg) {
+        throw new HttpError(400, "This load is more than your truck can carry");
+      }
+    }
 
     const next = NEXT[booking.status];
     if (!next) throw new HttpError(409, `This trip is ${booking.status.toLowerCase()}`);
@@ -141,13 +176,27 @@ driverRouter.post(
 
     const stamp = STAMP[next];
     const updated = await prisma.$transaction(async (tx) => {
+      if (!booking.driverId) {
+        const claimed = await tx.truckBooking.updateMany({
+          where: { id: booking.id, status: "PAID", driverId: null },
+          data: {
+            driverId: driver.id,
+            truckId: driver.truck?.id,
+            status: "ACCEPTED",
+            acceptedAt: new Date(),
+          },
+        });
+        if (claimed.count === 0) throw new HttpError(409, "Another driver took this trip");
+      }
       const b = await tx.truckBooking.update({
         where: { id: booking.id },
-        data: {
-          status: next,
-          ...(stamp ? { [stamp]: new Date() } : {}),
-          ...(next === "DELIVERED" ? { proofReceivedBy: receivedBy } : {}),
-        },
+        data: booking.driverId
+          ? {
+              status: next,
+              ...(stamp ? { [stamp]: new Date() } : {}),
+              ...(next === "DELIVERED" ? { proofReceivedBy: receivedBy } : {}),
+            }
+          : {},
         include: tripInclude,
       });
       await tx.bookingEvent.create({
@@ -186,6 +235,40 @@ driverRouter.post(
         data: { bookingId: updated.id },
       });
     }
+
+    res.json(updated);
+  }),
+);
+
+/** Pass on a paid offer. It leaves this driver's list and opens for the next driver. */
+driverRouter.post(
+  "/trips/:id/decline",
+  asyncHandler(async (req, res) => {
+    const { driver } = await requireDriver(req);
+    const booking = await prisma.truckBooking.findUnique({ where: { id: String(req.params.id) } });
+    if (!booking || (booking.driverId && booking.driverId !== driver.id)) {
+      throw new HttpError(404, "Trip not found");
+    }
+    if (booking.status !== "PAID") {
+      throw new HttpError(409, "This trip is already underway");
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.driverPass.upsert({
+        where: { driverId_bookingId: { driverId: driver.id, bookingId: booking.id } },
+        create: { driverId: driver.id, bookingId: booking.id },
+        update: {},
+      });
+      const b = await tx.truckBooking.update({
+        where: { id: booking.id },
+        data: { driverId: null, truckId: null },
+        include: tripInclude,
+      });
+      await tx.bookingEvent.create({
+        data: { bookingId: b.id, status: "PAID", note: "Driver passed. The trip is open for the next driver." },
+      });
+      return b;
+    });
 
     res.json(updated);
   }),
@@ -232,6 +315,7 @@ const truckBody = z.object({
   name: z.string().trim().min(2).optional(),
   capacityTons: z.coerce.number().positive().optional(),
   price: z.coerce.number().int().positive().optional(),
+  ratePerKm: z.coerce.number().int().min(0).optional(),
   body: z.enum(["Open body", "Closed body"]).optional(),
   plate: z.string().trim().min(4).optional(),
   etaMin: z.coerce.number().int().positive().optional(),

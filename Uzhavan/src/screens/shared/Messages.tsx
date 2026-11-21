@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +20,7 @@ import { useAuth } from "../../context/AuthContext";
 import { imageFor } from "../../lib/images";
 import type { SharedScreens } from "../../navigation/types";
 import { colors, shadow } from "../../theme";
+import { ChatScroll } from "../../components/keyboard";
 
 function ago(iso: string) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -119,7 +120,7 @@ export function ChatThread() {
   const rows = messages.data ?? [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           <View style={styles.replyRow}>
@@ -141,7 +142,7 @@ export function ChatThread() {
         }
       >
         <AppHeader title={name} />
-        <ScrollView contentContainerStyle={styles.pad}>
+        <ChatScroll contentContainerStyle={styles.pad}>
           {messages.isLoading ? (
             <ActivityIndicator color={colors.forest} style={{ marginTop: 40 }} />
           ) : rows.length === 0 ? (
@@ -158,8 +159,7 @@ export function ChatThread() {
                 );
               })}
             </View>
-          )}
-        </ScrollView>
+          )}        </ChatScroll>
       </Screen>
     </KeyboardAvoidingView>
   );

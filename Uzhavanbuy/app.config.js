@@ -26,6 +26,7 @@ module.exports = ({ config }) => ({
   name: TARGET.name,
   slug: "uzhavan",
   scheme: TARGET.scheme,
+  plugins: [...(config.plugins ?? []), "@react-native-community/datetimepicker"],
   ios: { ...config.ios, bundleIdentifier: TARGET.id },
   android: { ...config.android, package: TARGET.id },
   extra: { ...config.extra, appKind: TARGET.appKind },

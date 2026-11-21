@@ -21,6 +21,7 @@ import { ApiError } from "../../lib/api";
 import { inr, kg } from "../../lib/format";
 import type { DriverStackParamList } from "../../navigation/types";
 import { colors, shadow } from "../../theme";
+import { FormScroll } from "../../components/keyboard";
 
 export function TripDetail() {
   const navigation = useNavigation();
@@ -114,7 +115,7 @@ export function TripDetail() {
       }
     >
       <AppHeader title={trip.code} />
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+      <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         <View style={styles.statusRow}>
           <Chip
             label={BOOKING_LABEL[trip.status]}
@@ -204,7 +205,7 @@ export function TripDetail() {
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }

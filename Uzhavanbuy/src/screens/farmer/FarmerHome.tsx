@@ -11,6 +11,7 @@ import { imageFor } from "../../lib/images";
 import { inr, kg } from "../../lib/format";
 import type { FarmerStackParamList } from "../../navigation/types";
 import { colors, shadow } from "../../theme";
+import { Avatar } from "../../components/Avatar";
 
 export function FarmerHome() {
   const navigation = useNavigation<NativeStackNavigationProp<FarmerStackParamList>>();
@@ -41,7 +42,7 @@ export function FarmerHome() {
             <Text style={styles.h1}>{s?.farm.name ?? "Your farm"}</Text>
             <Text style={styles.muted}>{s?.farm.location}</Text>
           </View>
-          <Image source={imageFor(s?.farm.avatarKey)} style={styles.avatar} />
+          <Avatar size={56} />
         </View>
 
         {s && s.pendingRequests > 0 ? (
@@ -140,7 +141,6 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   hero: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12 },
   h1: { fontSize: 22, fontWeight: "700", color: colors.ink },
-  avatar: { width: 56, height: 56, borderRadius: 28 },
   muted: { fontSize: 12.5, color: colors.muted },
   alert: { marginTop: 16, flexDirection: "row", gap: 12, alignItems: "center", backgroundColor: colors.amberBg, borderRadius: 16, padding: 14 },
   alertIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },

@@ -1,5 +1,11 @@
 import { Platform } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
   toCrop,
@@ -59,7 +65,9 @@ export const keys = {
 };
 
 /** Poll while a screen is waiting on someone else to act. */
-const LIVE = { refetchInterval: 8000 } as const;
+const LIVE = { refetchInterval: 20_000 } as const;
+
+const CROP_PAGE = 40;
 
 // ---- Shared ---------------------------------------------------------------
 
@@ -83,9 +91,13 @@ export function useCrops(
   search = "",
   filters: CropFilters = {},
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: [...keys.crops(filter, search), filters],
-    queryFn: async (): Promise<{ origin: string | null; crops: Crop[] }> => {
+    initialPageParam: 0,
+    // Keep the old list on screen while a new filter or search loads, rather
+    // than flashing a spinner on every keystroke.
+    placeholderData: keepPreviousData,
+    queryFn: async ({ pageParam }): Promise<CropSearch> => {
       const params = new URLSearchParams();
       if (filter === "ready" || filter === "upcoming") params.set("status", filter);
       if (filter === "following") params.set("following", "true");
@@ -97,10 +109,25 @@ export function useCrops(
       if (filters.minPrice !== undefined) params.set("minPrice", String(filters.minPrice));
       if (filters.maxPrice !== undefined) params.set("maxPrice", String(filters.maxPrice));
       if (filters.sort) params.set("sort", filters.sort);
-      const qs = params.toString();
-      const res = await api<CropSearch>(`/crops${qs ? `?${qs}` : ""}`);
-      return { origin: res.origin, crops: res.crops.map(toCrop) };
+      params.set("limit", String(CROP_PAGE));
+      params.set("offset", String(pageParam));
+      return api<CropSearch>(`/crops?${params.toString()}`);
     },
+    getNextPageParam: (last, pages) =>
+      last.hasMore ? pages.reduce((n, p) => n + p.crops.length, 0) : undefined,
+    select: (data): { origin: string | null; crops: Crop[] } => ({
+      origin: data.pages[0]?.origin ?? null,
+      crops: data.pages.flatMap((p) => p.crops.map(toCrop)),
+    }),
+  });
+}
+
+/** Category names for the filter chips — one small request instead of the whole catalogue. */
+export function useCategories() {
+  return useQuery({
+    queryKey: ["crop-categories"],
+    queryFn: () => api<string[]>("/crops/categories"),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -756,7 +783,7 @@ export function useConversations() {
 export function useStartConversation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { farmId: string; cropId?: string }) =>
+    mutationFn: (body: { farmId?: string; cropId?: string; buyerId?: string }) =>
       api<Conversation>("/conversations", { method: "POST", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["conversations"] }),
   });

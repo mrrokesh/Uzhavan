@@ -1,21 +1,26 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ImageSourcePropType } from "react-native";
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, type NavigationProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Logo } from "../components/Logo";
 import { Screen } from "../components/Chrome";
 import { Chip, OutlineButton } from "../components/ui";
 import { ProfileLinks } from "../components/ProfileLinks";
-import { useMe, useOrders, useRequests } from "../api/hooks";
+import { useMe, useOrders, useRequests, useUpdateProfile } from "../api/hooks";
+import { BuyerLocation, type ShopPlace } from "../components/LocationSheet";
+import { loadPlace, savePlace } from "../lib/place";
+import { useApp } from "../context/AppContext";
+import { ApiError } from "../lib/api";
 import { BOOKING_LABEL, REQUEST_LABEL, type RequestStatus } from "../api/types";
 import { useAuth } from "../context/AuthContext";
 import { imageFor } from "../lib/images";
 import { inr, kg } from "../lib/format";
-import type { RootStackParamList } from "../navigation/types";
+import type { RootStackParamList, TabParamList } from "../navigation/types";
 import { APP_NAME } from "../lib/appInfo";
 import { colors, shadow } from "../theme";
+import { Avatar } from "../components/Avatar";
 
 const REQUEST_TONE: Record<RequestStatus, "amber" | "mint" | "neutral"> = {
   PENDING: "amber",
@@ -53,7 +58,9 @@ export function MyOrders() {
       >
         <View style={styles.head}>
           <Text style={styles.h1}>My Orders</Text>
-          <Ionicons name="notifications-outline" size={18} color={colors.ink} />
+          <Pressable onPress={() => navigation.navigate("Notifications")} accessibilityLabel="Notifications">
+            <Ionicons name="notifications-outline" size={18} color={colors.ink} />
+          </Pressable>
         </View>
 
         {loading ? <ActivityIndicator color={colors.forest} style={{ marginTop: 32 }} /> : null}
@@ -165,42 +172,102 @@ function OrderCard({
 }
 
 export function Profile() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const tabs = useNavigation<NavigationProp<TabParamList>>();
   const { user, signOut } = useAuth();
+  const { setFilter, setSavedOnly } = useApp();
   const me = useMe();
+  const updateProfile = useUpdateProfile();
+  const [districtOpen, setDistrictOpen] = useState(false);
+  const [shop, setShop] = useState<ShopPlace>({
+    state: "Tamil Nadu",
+    district: user?.district ?? "",
+    radiusKm: 100,
+  });
+
+  useEffect(() => {
+    void loadPlace().then((saved) => {
+      if (saved) setShop(saved);
+      else if (user?.district) setShop({ state: "Tamil Nadu", district: user.district, radiusKm: 100 });
+    });
+  }, [user?.district]);
 
   const following = me.data?.following ?? [];
   const saved = me.data?.saved ?? [];
   const profile = me.data ?? user;
+
+  const saveDistrict = async (next: ShopPlace) => {
+    setShop(next);
+    await savePlace(next);
+    if (next.state !== "Tamil Nadu") return;
+    try {
+      await updateProfile.mutateAsync({ district: next.district });
+    } catch (err) {
+      Alert.alert("Couldn’t save the district", err instanceof ApiError ? err.message : "Try again.");
+    }
+  };
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.pad}>
         <Logo compact />
         <View style={[styles.card, styles.row, { marginTop: 12 }]}>
-          <Image source={imageFor(profile?.avatarKey)} style={styles.av} />
+          <Avatar size={56} />
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{profile?.name}</Text>
             <Text style={styles.muted}>
               {profile?.business} · {profile?.role === "BUYER" ? "Wholesale buyer" : profile?.role}
             </Text>
-            <Text style={styles.muted}>{profile?.district}, Tamil Nadu</Text>
+            <Pressable onPress={() => setDistrictOpen(true)}>
+              <Text style={styles.muted}>
+                {shop.district || profile?.district || "Set location"}, {shop.state}
+              </Text>
+            </Pressable>
           </View>
         </View>
 
         <View style={[styles.card, { padding: 0, overflow: "hidden" }]}>
           <InfoRow icon="business-outline" title={profile?.warehouse ?? "—"} sub={profile?.warehouseAddress ?? "Warehouse"} />
-          <InfoRow icon="location-outline" title="Also buys for" sub={profile?.market ?? "—"} />
-          <InfoRow icon="call-outline" title={profile?.phone ?? "—"} sub="WhatsApp available" />
-          <InfoRow icon="mail-outline" title={profile?.email ?? "—"} sub="Sign-in email" />
-          <InfoRow icon="language-outline" title="Language" sub="English · தமிழ் ready" last />
+          <InfoRow icon="location-outline" title={profile?.market || "No extra market yet"} sub="Also buys for" />
+          <InfoRow
+            icon="call-outline"
+            title={profile?.phone ?? "—"}
+            sub="Tap to call"
+            onPress={() => {
+              if (profile?.phone) void Linking.openURL(`tel:${profile.phone}`);
+            }}
+          />
+          <InfoRow icon="mail-outline" title={profile?.email ?? "—"} sub="Sign-in email" last />
         </View>
 
         <ProfileLinks />
 
         <View style={styles.stats}>
-          <Stat n={String(following.length)} l="Following" />
-          <Stat n={String(saved.length)} l="Saved crops" />
+          <Stat
+            n={String(following.length)}
+            l="Following"
+            onPress={() => {
+              setSavedOnly(false);
+              setFilter("following");
+              tabs.navigate("Home");
+            }}
+          />
+          <Stat
+            n={String(saved.length)}
+            l="Saved crops"
+            onPress={() => {
+              setSavedOnly(true);
+              setFilter("for-you");
+              tabs.navigate("Home");
+            }}
+          />
         </View>
+        <BuyerLocation
+          visible={districtOpen}
+          place={shop}
+          onApply={(next) => void saveDistrict(next)}
+          onClose={() => setDistrictOpen(false)}
+        />
 
         <View style={{ marginTop: 8, flexDirection: "row" }}>
           <OutlineButton label="Sign out" tone="danger" icon="log-out-outline" onPress={() => void signOut()} />
@@ -216,29 +283,34 @@ function InfoRow({
   title,
   sub,
   last,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   sub: string;
   last?: boolean;
+  onPress?: () => void;
 }) {
-  return (
+  const body = (
     <View style={[styles.info, !last && styles.infoBorder]}>
       <Ionicons name={icon} size={16} color={colors.forest} />
       <View style={{ flex: 1 }}>
         <Text style={styles.body}>{title}</Text>
         <Text style={styles.muted}>{sub}</Text>
       </View>
+      {onPress ? <Ionicons name="chevron-forward" size={14} color={colors.faint} /> : null}
     </View>
   );
+  if (!onPress) return body;
+  return <Pressable onPress={onPress}>{body}</Pressable>;
 }
 
-function Stat({ n, l }: { n: string; l: string }) {
+function Stat({ n, l, onPress }: { n: string; l: string; onPress: () => void }) {
   return (
-    <View style={[styles.card, { flex: 1, alignItems: "center" }]}>
+    <Pressable style={[styles.card, { flex: 1, alignItems: "center" }]} onPress={onPress}>
       <Text style={styles.statN}>{n}</Text>
       <Text style={styles.muted}>{l}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -251,7 +323,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 12, alignItems: "center" },
   between: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
   img: { width: 56, height: 56, borderRadius: 12 },
-  av: { width: 56, height: 56, borderRadius: 28 },
   title: { fontSize: 15, fontWeight: "600", color: colors.ink, flexShrink: 1 },
   body: { fontSize: 13.5, fontWeight: "500" },
   muted: { fontSize: 12, color: colors.muted },

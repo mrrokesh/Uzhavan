@@ -11,6 +11,7 @@ import { inr, kg } from "../../lib/format";
 import { REQUEST_LABEL } from "../../api/types";
 import type { FarmerStackParamList } from "../../navigation/types";
 import { colors, shadow } from "../../theme";
+import { FormScroll } from "../../components/keyboard";
 
 export function FarmerRequestDetail() {
   const navigation = useNavigation();
@@ -89,7 +90,7 @@ export function FarmerRequestDetail() {
       }
     >
       <AppHeader title="Buyer request" />
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+      <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         {!pending ? (
           <View style={{ marginBottom: 12 }}>
             <Chip label={REQUEST_LABEL[request.status]} tone={request.status === "CONFIRMED" ? "mint" : "neutral"} />
@@ -197,7 +198,7 @@ export function FarmerRequestDetail() {
 
         {request.declineReason ? <Text style={styles.hint}>Reason given: {request.declineReason}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }

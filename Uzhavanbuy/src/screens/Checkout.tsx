@@ -43,7 +43,7 @@ function checkoutHtml(input: {
   return `<!doctype html>
 <html>
   <head><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
-  <body style="margin:0;background:#FAF6F0">
+  <body style="margin:0;background:#FFFFFF">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>
       var send = function (payload) {
@@ -62,7 +62,7 @@ function checkoutHtml(input: {
             email: ${JSON.stringify(input.email)},
             contact: ${JSON.stringify(input.phone)}
           },
-          theme: { color: "#1B5E3B" },
+          theme: { color: "#157A32" },
           modal: {
             ondismiss: function () { send({ kind: "cancelled" }); }
           },

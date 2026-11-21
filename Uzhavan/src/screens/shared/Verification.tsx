@@ -4,7 +4,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,14 +13,16 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { CommonActions, useNavigation } from "@react-navigation/native";
 import { AppHeader, Screen } from "../../components/Chrome";
+import { DateField } from "../../components/DateField";
 import { Chip, Field, InfoNote, OutlineButton, PrimaryButton } from "../../components/ui";
 import { useSubmitVerification, useVerification } from "../../api/hooks";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/api";
 import type { DocumentType, UploadDoc } from "../../api/types";
 import { colors, shadow } from "../../theme";
+import { FormScroll } from "../../components/keyboard";
 
 /** Roughly the server's 5 MB cap, allowing for base64 inflation. */
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -39,12 +41,9 @@ const LABELS: Partial<Record<DocumentType, string>> = {
   VEHICLE_PERMIT: "Goods carriage permit",
 };
 
-/** yyyy-mm-dd, which is what the server's z.string().date() wants. */
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 export function Verification() {
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { user, justSignedUp, clearSignup } = useAuth();
   const state = useVerification();
   const submit = useSubmitVerification();
 
@@ -57,7 +56,9 @@ export function Verification() {
   const [permitExpiry, setPermitExpiry] = useState("");
   const [docs, setDocs] = useState<Picked[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const [step, setStep] = useState(0);
 
   if (state.isLoading) {
     return (
@@ -131,18 +132,22 @@ export function Verification() {
       );
       return;
     }
+    if (isFarmer && (!docs.some((d) => d.type === "FARMER_CARD") || !docs.some((d) => d.type === "LAND_RECORD"))) {
+      setError("Add both the farmer card and the land record.");
+      return;
+    }
+    if (
+      isDriver &&
+      ["DRIVING_LICENCE", "VEHICLE_RC", "VEHICLE_INSURANCE", "VEHICLE_PERMIT"].some(
+        (type) => !docs.some((d) => d.type === type),
+      )
+    ) {
+      setError("Add the driving licence, RC, insurance and permit.");
+      return;
+    }
     if (docs.length === 0) {
       setError("Attach at least one document");
       return;
-    }
-    for (const [label, value] of [
-      ["Insurance expiry", insuranceExpiry],
-      ["Permit expiry", permitExpiry],
-    ] as const) {
-      if (isDriver && value.trim() && !ISO_DATE.test(value.trim())) {
-        setError(`${label} should be written as YYYY-MM-DD`);
-        return;
-      }
     }
 
     const value = idNumber.trim().toUpperCase();
@@ -183,6 +188,37 @@ export function Verification() {
     } finally {
       setWorking(false);
     }
+  };
+
+  const finish = () => {
+    clearSignup();
+    if (justSignedUp) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: user?.role === "DRIVER" ? "DriverTabs" : "FarmerTabs" }],
+        }),
+      );
+      return;
+    }
+    if (navigation.canGoBack()) navigation.goBack();
+  };
+
+  const nextFarmerStep = () => {
+    if (step === 0 && !/^[A-Z0-9/-]{6,30}$/.test(idNumber.trim().toUpperCase())) {
+      setFieldError("Enter the farmer card number, for example TN/DGL/2019/004521.");
+      return;
+    }
+    if (step === 1 && !docs.some((d) => d.type === "FARMER_CARD")) {
+      setFieldError("Add a photo of the farmer card.");
+      return;
+    }
+    if (step === 2 && !docs.some((d) => d.type === "LAND_RECORD")) {
+      setFieldError("Add a photo of the land record.");
+      return;
+    }
+    setFieldError(null);
+    setStep((n) => Math.min(3, n + 1));
   };
 
   // ── Already settled ──────────────────────────────────────────
@@ -230,10 +266,239 @@ export function Verification() {
             <Chip label={`${s.documents.length} document${s.documents.length === 1 ? "" : "s"} submitted`} tone="amber" />
           </View>
           <View style={{ marginTop: 20, width: "100%" }}>
-            <OutlineButton label="Back" onPress={() => navigation.goBack()} />
+            <PrimaryButton label={justSignedUp ? (isDriver ? "Continue" : "Continue to my farm") : "Done"} onPress={finish} />
           </View>
         </ScrollView>
       </Screen>
+    );
+  }
+
+  if (isFarmer) {
+    const card = docs.find((d) => d.type === "FARMER_CARD");
+    const land = docs.find((d) => d.type === "LAND_RECORD");
+    const titles = ["Farmer card", "Card photo", "Land record", "Confirm"];
+    return (
+      <KeyboardAvoidingView style={{ flex: 1 }}>
+        <Screen
+          footer={
+            step < 3 ? (
+              <PrimaryButton label="Continue" onPress={nextFarmerStep} />
+            ) : (
+              <PrimaryButton label="Submit documents" onPress={() => void send()} loading={working} disabled={working} />
+            )
+          }
+        >
+          <AppHeader title={justSignedUp ? "Verify your farm" : "Get verified"} />
+          <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+            <Text style={styles.stepMeta}>Step {step + 1} of 4 · {titles[step]}</Text>
+            <View style={styles.progress}>
+              {[0, 1, 2, 3].map((n) => (
+                <View key={n} style={[styles.progressBit, n <= step && styles.progressOn]} />
+              ))}
+            </View>
+            {s?.status === "REJECTED" ? (
+              <InfoNote tone="amber">
+                <Ionicons name="alert-circle-outline" size={16} color={colors.amberText} />
+                <Text style={{ flex: 1, color: colors.amberText, fontSize: 12.5 }}>
+                  {s.rejectionReason ?? "Your last submission was rejected. Send the documents again."}
+                </Text>
+              </InfoNote>
+            ) : (
+              <Text style={styles.lead}>
+                Buyers only see a verified tick after these documents are checked. The number and photos stay encrypted.
+              </Text>
+            )}
+
+            {step === 0 ? (
+              <View style={{ marginTop: 18 }}>
+                <Field
+                  label="Farmer card number"
+                  value={idNumber}
+                  onChangeText={(value) => {
+                    setIdNumber(value);
+                    setFieldError(null);
+                  }}
+                  placeholder="TN/DGL/2019/004521"
+                  autoCapitalize="characters"
+                  required
+                  error={fieldError ?? undefined}
+                />
+              </View>
+            ) : null}
+
+            {step === 1 ? (
+              <DocSlot
+                title="Farmer card"
+                picked={card}
+                error={fieldError}
+                onPress={() => {
+                  setFieldError(null);
+                  attach("FARMER_CARD");
+                }}
+              />
+            ) : null}
+
+            {step === 2 ? (
+              <DocSlot
+                title="Land record (patta / chitta)"
+                picked={land}
+                error={fieldError}
+                onPress={() => {
+                  setFieldError(null);
+                  attach("LAND_RECORD");
+                }}
+              />
+            ) : null}
+
+            {step === 3 ? (
+              <View style={{ marginTop: 18, gap: 10 }}>
+                <Text style={styles.docTitle}>Farmer card · {idNumber.trim().toUpperCase()}</Text>
+                <Text style={styles.hint}>{card ? "Card photo added" : "Card photo missing"}</Text>
+                <Text style={styles.hint}>{land ? "Land record added" : "Land record missing"}</Text>
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+              </View>
+            ) : null}
+
+            {justSignedUp && step === 0 ? (
+              <Pressable onPress={finish} style={{ marginTop: 22 }}>
+                <Text style={styles.later}>I’ll do this later</Text>
+              </Pressable>
+            ) : null}
+          </FormScroll>
+        </Screen>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  if (isDriver) {
+    const licence = docs.find((d) => d.type === "DRIVING_LICENCE");
+    const rc = docs.find((d) => d.type === "VEHICLE_RC");
+    const insurance = docs.find((d) => d.type === "VEHICLE_INSURANCE");
+    const permit = docs.find((d) => d.type === "VEHICLE_PERMIT");
+    const titles = ["Licence number", "Licence photo", "RC book", "Insurance and permit", "Confirm"];
+    const nextDriverStep = () => {
+      const licenceOk = /^[A-Z]{2}[0-9]{9,14}$/.test(idNumber.trim().toUpperCase().replace(/[\s-]/g, ""));
+      if (step === 0 && !licenceOk) {
+        setFieldError("Enter the licence number, for example TN37 20190001234.");
+        return;
+      }
+      if (step === 1 && !licence) {
+        setFieldError("Add a photo of the driving licence.");
+        return;
+      }
+      if (step === 2 && (!rcNumber.trim() || !rc)) {
+        setFieldError("Enter the RC number and add a photo of the book.");
+        return;
+      }
+      if (step === 3 && (!insurance || !permit || !insuranceExpiry || !permitExpiry)) {
+        setFieldError("Add both photos and both expiry dates.");
+        return;
+      }
+      setFieldError(null);
+      setStep((n) => Math.min(4, n + 1));
+    };
+    return (
+      <KeyboardAvoidingView style={{ flex: 1 }}>
+        <Screen
+          footer={
+            step < 4 ? (
+              <PrimaryButton label="Continue" onPress={nextDriverStep} />
+            ) : (
+              <PrimaryButton label="Submit documents" onPress={() => void send()} loading={working} disabled={working} />
+            )
+          }
+        >
+          <AppHeader title={justSignedUp ? "Driver papers" : "Get verified"} />
+          <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+            <Text style={styles.stepMeta}>Step {step + 1} of 5 · {titles[step]}</Text>
+            <View style={styles.progress}>
+              {[0, 1, 2, 3, 4].map((n) => (
+                <View key={n} style={[styles.progressBit, n <= step && styles.progressOn]} />
+              ))}
+            </View>
+            <Text style={styles.lead}>
+              You can set a fare now. Trips open up after these papers are approved. Photos stay encrypted.
+            </Text>
+            {step === 0 ? (
+              <View style={{ marginTop: 18 }}>
+                <Field
+                  label="Driving licence number"
+                  value={idNumber}
+                  onChangeText={(value) => {
+                    setIdNumber(value);
+                    setFieldError(null);
+                  }}
+                  placeholder="TN37 20190001234"
+                  autoCapitalize="characters"
+                  required
+                  error={fieldError ?? undefined}
+                />
+              </View>
+            ) : null}
+            {step === 1 ? (
+              <DocSlot
+                title="Driving licence"
+                picked={licence}
+                error={fieldError}
+                onPress={() => {
+                  setFieldError(null);
+                  attach("DRIVING_LICENCE");
+                }}
+              />
+            ) : null}
+            {step === 2 ? (
+              <View style={{ marginTop: 18, gap: 14 }}>
+                <Field
+                  label="RC number"
+                  value={rcNumber}
+                  onChangeText={(value) => {
+                    setRcNumber(value);
+                    setFieldError(null);
+                  }}
+                  autoCapitalize="characters"
+                  required
+                  error={fieldError ?? undefined}
+                />
+                <DocSlot
+                  title="RC book"
+                  picked={rc}
+                  error={null}
+                  onPress={() => {
+                    setFieldError(null);
+                    attach("VEHICLE_RC");
+                  }}
+                />
+              </View>
+            ) : null}
+            {step === 3 ? (
+              <View style={{ marginTop: 18, gap: 14 }}>
+                <DateField label="Insurance expiry" value={insuranceExpiry} onChange={setInsuranceExpiry} storage="iso" />
+                <DocSlot title="Insurance certificate" picked={insurance} error={null} onPress={() => attach("VEHICLE_INSURANCE")} />
+                <DateField label="Permit expiry" value={permitExpiry} onChange={setPermitExpiry} storage="iso" />
+                <DocSlot
+                  title="Goods carriage permit"
+                  picked={permit}
+                  error={fieldError}
+                  onPress={() => {
+                    setFieldError(null);
+                    attach("VEHICLE_PERMIT");
+                  }}
+                />
+              </View>
+            ) : null}
+            {step === 4 ? (
+              <View style={{ marginTop: 18, gap: 8 }}>
+                <Text style={styles.docTitle}>Licence · {idNumber.trim().toUpperCase()}</Text>
+                <Text style={styles.hint}>{licence ? "Licence photo added" : "Licence photo missing"}</Text>
+                <Text style={styles.hint}>{rc ? `RC ${rcNumber.trim().toUpperCase()} added` : "RC missing"}</Text>
+                <Text style={styles.hint}>{insurance ? `Insurance expires ${insuranceExpiry}` : "Insurance missing"}</Text>
+                <Text style={styles.hint}>{permit ? `Permit expires ${permitExpiry}` : "Permit missing"}</Text>
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+              </View>
+            ) : null}
+          </FormScroll>
+        </Screen>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -241,7 +506,7 @@ export function Verification() {
   const required: DocumentType[] = s?.required.documents ?? [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           <PrimaryButton
@@ -253,7 +518,7 @@ export function Verification() {
         }
       >
         <AppHeader title="Get verified" />
-        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+        <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           {s?.status === "REJECTED" ? (
             <View style={{ marginBottom: 16 }}>
               <InfoNote tone="amber">
@@ -307,26 +572,26 @@ export function Verification() {
                 autoCapitalize="characters"
               />
               <View style={{ marginTop: 14 }}>
-                <Field
+                <DateField
                   label="Insurance valid until (optional)"
                   value={insuranceExpiry}
-                  onChangeText={setInsuranceExpiry}
-                  placeholder="2027-03-31"
-
+                  onChange={setInsuranceExpiry}
+                  storage="iso"
+                  minToday={false}
                 />
               </View>
               <View style={{ marginTop: 14 }}>
-                <Field
+                <DateField
                   label="Permit valid until (optional)"
                   value={permitExpiry}
-                  onChangeText={setPermitExpiry}
-                  placeholder="2027-03-31"
-
+                  onChange={setPermitExpiry}
+                  storage="iso"
+                  minToday={false}
                 />
               </View>
               <Text style={styles.hint}>
-                Dates as YYYY-MM-DD. We use them to warn you before cover lapses — an expired
-                insurance or permit means the truck can’t legally carry goods.
+                We use these dates to warn you before cover lapses — an expired insurance or permit
+                means the truck can’t legally carry goods.
               </Text>
             </>
           ) : null}
@@ -385,9 +650,41 @@ export function Verification() {
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+        </FormScroll>
       </Screen>
     </KeyboardAvoidingView>
+  );
+}
+
+function DocSlot({
+  title,
+  picked,
+  error,
+  onPress,
+}: {
+  title: string;
+  picked?: Picked;
+  error: string | null;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ marginTop: 18 }}>
+      <Pressable style={[styles.docRow, error ? { borderWidth: 1, borderColor: colors.danger } : null]} onPress={onPress}>
+        {picked ? (
+          <Image source={{ uri: picked.uri }} style={styles.thumb} />
+        ) : (
+          <View style={[styles.thumb, styles.thumbEmpty]}>
+            <Ionicons name="camera-outline" size={22} color={colors.faint} />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.docTitle}>{title}</Text>
+          <Text style={styles.hint}>{picked ? "Tap to replace" : "Take a photo or choose one"}</Text>
+        </View>
+        <Ionicons name={picked ? "checkmark-circle" : "chevron-forward"} size={20} color={picked ? colors.forest : colors.faint} />
+      </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+    </View>
   );
 }
 
@@ -428,4 +725,9 @@ const styles = StyleSheet.create({
   sub: { marginTop: 8, fontSize: 13.5, lineHeight: 20, color: colors.muted, textAlign: "center", maxWidth: 300 },
   faint: { marginTop: 12, fontSize: 12, color: colors.faint },
   error: { marginTop: 16, fontSize: 13, color: colors.danger },
+  stepMeta: { marginTop: 8, fontSize: 12, fontWeight: "600", color: colors.muted },
+  progress: { flexDirection: "row", gap: 6, marginTop: 8, marginBottom: 8 },
+  progressBit: { flex: 1, height: 4, borderRadius: 4, backgroundColor: colors.line },
+  progressOn: { backgroundColor: colors.forest },
+  later: { textAlign: "center", color: colors.muted, fontWeight: "600", fontSize: 14 },
 });

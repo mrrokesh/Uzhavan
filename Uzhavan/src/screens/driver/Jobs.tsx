@@ -7,7 +7,7 @@ import { Screen } from "../../components/Chrome";
 import { Logo } from "../../components/Logo";
 import { Chip } from "../../components/ui";
 import { RouteStops } from "../../components/Widgets";
-import { useAdvanceTrip, useDriverJobs, useDriverSummary, useSetAvailability } from "../../api/hooks";
+import { useAdvanceTrip, useDeclineTrip, useDriverJobs, useDriverSummary, useSetAvailability } from "../../api/hooks";
 import { imageFor } from "../../lib/images";
 import { ApiError } from "../../lib/api";
 import { inr, kg } from "../../lib/format";
@@ -20,6 +20,7 @@ export function DriverJobs() {
   const jobs = useDriverJobs();
   const availability = useSetAvailability();
   const advance = useAdvanceTrip();
+  const decline = useDeclineTrip();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +34,19 @@ export function DriverJobs() {
       await advance.mutateAsync({ id });
       navigation.navigate("TripDetail", { bookingId: id });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn’t accept this trip.");
+      setError(err instanceof ApiError ? err.message : "Couldn’t take this trip.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const leave = async (id: string) => {
+    setBusy(id);
+    setError(null);
+    try {
+      await decline.mutateAsync(id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn’t pass on this trip.");
     } finally {
       setBusy(null);
     }
@@ -45,6 +58,9 @@ export function DriverJobs() {
         <View style={styles.top}>
           <Logo />
           <View style={styles.onlineRow}>
+            <Pressable onPress={() => navigation.navigate("Help")} accessibilityLabel="Support" hitSlop={8}>
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.ink} />
+            </Pressable>
             <Text style={[styles.onlineText, { color: online ? colors.forest : colors.muted }]}>
               {online ? "Online" : "Offline"}
             </Text>
@@ -66,8 +82,18 @@ export function DriverJobs() {
                 : "No truck registered"}
             </Text>
           </View>
-          <Text style={{ fontSize: 40 }}>🚚</Text>
         </View>
+
+        {summary.data && !summary.data.driver.verified && summary.data.papers !== "VERIFIED" ? (
+          <Pressable style={styles.offline} onPress={() => navigation.navigate("Verification")}>
+            <Ionicons name="document-text-outline" size={18} color={colors.amberText} />
+            <Text style={styles.offlineText}>
+              {summary.data.papers === "PENDING"
+                ? "Your licence and vehicle papers are under review. You can take trips after they are approved."
+                : "Add your driving licence, RC, insurance and permit before you can take trips."}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.stats}>
           <Stat n={String(summary.data?.activeTrips ?? 0)} l="Active" />
@@ -110,17 +136,24 @@ export function DriverJobs() {
               <RouteStops pickup={b.pickup} drop={b.destination} />
             </View>
 
-            <View style={styles.between}>
-              <Text style={styles.tiny}>{b.distanceKm} km · {b.code}</Text>
+            <Text style={styles.tiny}>{b.distanceKm} km · {b.code}</Text>
+            <View style={styles.actions}>
+              <Pressable
+                style={[styles.leave, busy === b.id && { opacity: 0.5 }]}
+                disabled={busy === b.id}
+                onPress={() => void leave(b.id)}
+              >
+                <Text style={styles.leaveText}>Leave it</Text>
+              </Pressable>
               <Pressable
                 style={[styles.accept, busy === b.id && { opacity: 0.5 }]}
                 disabled={busy === b.id}
-                onPress={() => accept(b.id)}
+                onPress={() => void accept(b.id)}
               >
                 {busy === b.id ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.acceptText}>Accept trip</Text>
+                  <Text style={styles.acceptText}>Take it</Text>
                 )}
               </Pressable>
             </View>
@@ -163,6 +196,9 @@ const styles = StyleSheet.create({
   fare: { marginTop: 4, fontSize: 17, fontWeight: "700", color: colors.forest },
   between: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   routeBox: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: 14 },
-  accept: { backgroundColor: colors.forest, borderRadius: 10, paddingHorizontal: 18, height: 40, alignItems: "center", justifyContent: "center", minWidth: 120 },
+  actions: { flexDirection: "row", gap: 8 },
+  leave: { flex: 1, height: 40, borderRadius: 10, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", backgroundColor: colors.white },
+  leaveText: { color: colors.ink, fontSize: 13.5, fontWeight: "600" },
+  accept: { flex: 1, backgroundColor: colors.forest, borderRadius: 10, paddingHorizontal: 18, height: 40, alignItems: "center", justifyContent: "center" },
   acceptText: { color: colors.white, fontSize: 13.5, fontWeight: "600" },
 });

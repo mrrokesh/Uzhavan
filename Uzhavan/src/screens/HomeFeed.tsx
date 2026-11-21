@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -15,6 +15,7 @@ import type { CropFilters as Filters } from "../api/types";
 import { useCrops, useMe, useToggleSaved } from "../api/hooks";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
+import { useDebounced } from "../lib/useDebounced";
 
 const TABS = [
   { id: "for-you" as const, label: "For you" },
@@ -29,7 +30,8 @@ export function HomeFeed() {
 
   const [filters, setFilters] = useState<Filters>({});
   const [sheetOpen, setSheetOpen] = useState(false);
-  const cropsQuery = useCrops(filter, search, filters);
+  const debouncedSearch = useDebounced(search);
+  const cropsQuery = useCrops(filter, debouncedSearch, filters);
   const me = useMe();
   const toggleSaved = useToggleSaved();
 
@@ -128,6 +130,19 @@ export function HomeFeed() {
               />
             ))
           )}
+          {cropsQuery.hasNextPage ? (
+            <Pressable
+              onPress={() => void cropsQuery.fetchNextPage()}
+              disabled={cropsQuery.isFetchingNextPage}
+              style={styles.more}
+            >
+              {cropsQuery.isFetchingNextPage ? (
+                <ActivityIndicator color={colors.forest} />
+              ) : (
+                <Text style={styles.moreText}>Show more crops</Text>
+              )}
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -159,5 +174,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   input: { flex: 1, fontSize: 14, color: colors.ink },
+  more: { alignItems: "center", paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.line },
+  moreText: { fontSize: 14, fontWeight: "600", color: colors.forest },
   msg: { marginTop: 32, textAlign: "center", fontSize: 13, color: colors.muted },
 });

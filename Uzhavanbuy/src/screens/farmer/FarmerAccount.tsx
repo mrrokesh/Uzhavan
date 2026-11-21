@@ -1,6 +1,7 @@
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "../../components/Chrome";
+import { FormScroll } from "../../components/keyboard";
 import { Logo } from "../../components/Logo";
 import { Chip, OutlineButton } from "../../components/ui";
 import { ProfileLinks } from "../../components/ProfileLinks";
@@ -11,6 +12,7 @@ import { imageFor } from "../../lib/images";
 import { inr, kg } from "../../lib/format";
 import { APP_NAME } from "../../lib/appInfo";
 import { colors, shadow } from "../../theme";
+import { Avatar } from "../../components/Avatar";
 
 export function FarmerAccount() {
   const { user, signOut } = useAuth();
@@ -22,17 +24,17 @@ export function FarmerAccount() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.pad}>
+      <FormScroll contentContainerStyle={styles.pad}>
         <Logo compact />
 
         <View style={[styles.card, styles.row, { marginTop: 12 }]}>
-          <Image source={imageFor(farm?.avatarKey ?? user?.avatarKey)} style={styles.av} />
+          <Avatar size={56} />
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{farm?.name ?? user?.name}</Text>
             <Text style={styles.muted}>{user?.name} · Farmer</Text>
             <Text style={styles.muted}>{farm?.location}</Text>
           </View>
-          {farm ? <Chip label={`★ ${farm.rating.toFixed(1)}`} tone="mint" /> : null}
+          {farm ? <Chip label={`${farm.rating.toFixed(1)} rating`} tone="mint" /> : null}
         </View>
 
         <View style={[styles.card, { padding: 0, overflow: "hidden" }]}>
@@ -72,7 +74,7 @@ export function FarmerAccount() {
           <OutlineButton label="Sign out" tone="danger" icon="log-out-outline" onPress={() => void signOut()} />
         </View>
         <Text style={styles.foot}>{APP_NAME} · Direct from Tamil Nadu farms</Text>
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }
@@ -103,7 +105,6 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16, paddingBottom: 32 },
   card: { marginBottom: 12, backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
   row: { flexDirection: "row", gap: 12, alignItems: "center" },
-  av: { width: 56, height: 56, borderRadius: 28 },
   img: { width: 48, height: 48, borderRadius: 10 },
   title: { fontSize: 16, fontWeight: "600", color: colors.ink },
   body: { fontSize: 13.5, fontWeight: "500", color: colors.ink },

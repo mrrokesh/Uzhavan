@@ -1,9 +1,8 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,9 +16,10 @@ import { AppHeader, Screen } from "../../components/Chrome";
 import { Field } from "../../components/ui";
 import { useConversations, useMarkConversationRead, useMessages, useSendMessage } from "../../api/hooks";
 import { useAuth } from "../../context/AuthContext";
-import { imageFor } from "../../lib/images";
 import type { SharedScreens } from "../../navigation/types";
 import { colors, shadow } from "../../theme";
+import { Avatar } from "../../components/Avatar";
+import { ChatScroll } from "../../components/keyboard";
 
 function ago(iso: string) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -55,7 +55,7 @@ export function Messages() {
             >
               <View style={styles.row}>
                 <View>
-                  <Image source={imageFor(c.with.avatarKey)} style={styles.av} />
+                  <Avatar size={48} />
                   {c.unread ? <View style={styles.dot} /> : null}
                 </View>
                 <View style={{ flex: 1 }}>
@@ -119,7 +119,7 @@ export function ChatThread() {
   const rows = messages.data ?? [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           <View style={styles.replyRow}>
@@ -141,7 +141,7 @@ export function ChatThread() {
         }
       >
         <AppHeader title={name} />
-        <ScrollView contentContainerStyle={styles.pad}>
+        <ChatScroll contentContainerStyle={styles.pad}>
           {messages.isLoading ? (
             <ActivityIndicator color={colors.forest} style={{ marginTop: 40 }} />
           ) : rows.length === 0 ? (
@@ -158,8 +158,7 @@ export function ChatThread() {
                 );
               })}
             </View>
-          )}
-        </ScrollView>
+          )}        </ChatScroll>
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -173,7 +172,6 @@ const styles = StyleSheet.create({
   faint: { fontSize: 11, color: colors.faint },
 
   card: { marginTop: 10, backgroundColor: colors.white, borderRadius: 14, padding: 13, ...shadow },
-  av: { width: 48, height: 48, borderRadius: 24 },
   dot: {
     position: "absolute",
     right: -1,

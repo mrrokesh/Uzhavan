@@ -12,6 +12,7 @@ import { ApiError } from "../../lib/api";
 import { inr } from "../../lib/format";
 import { APP_NAME } from "../../lib/appInfo";
 import { colors, shadow } from "../../theme";
+import { FormScroll } from "../../components/keyboard";
 
 export function DriverAccount() {
   const { user, signOut } = useAuth();
@@ -24,12 +25,14 @@ export function DriverAccount() {
 
   const [editing, setEditing] = useState(false);
   const [price, setPrice] = useState("");
+  const [ratePerKm, setRatePerKm] = useState("");
   const [eta, setEta] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
   const startEdit = () => {
     setPrice(String(truck?.price ?? ""));
+    setRatePerKm(String(truck?.ratePerKm ?? ""));
     setEta(String(truck?.etaMin ?? ""));
     setError(null);
     setEditing(true);
@@ -39,7 +42,11 @@ export function DriverAccount() {
     setWorking(true);
     setError(null);
     try {
-      await updateTruck.mutateAsync({ price: Number(price), etaMin: Number(eta) });
+      await updateTruck.mutateAsync({
+        price: Number(price),
+        ratePerKm: ratePerKm.trim() ? Number(ratePerKm) : 0,
+        etaMin: Number(eta),
+      });
       setEditing(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn’t save.");
@@ -58,7 +65,7 @@ export function DriverAccount() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+      <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         <Logo compact />
 
         <View style={[styles.card, styles.row, { marginTop: 12 }]}>
@@ -79,7 +86,11 @@ export function DriverAccount() {
           </View>
           <Switch
             value={driver?.online ?? false}
-            onValueChange={(v) => availability.mutate(v)}
+            onValueChange={(v) =>
+              availability.mutate(v, {
+                onError: (err) => setError(err instanceof ApiError ? err.message : "Couldn’t change availability."),
+              })
+            }
             trackColor={{ true: colors.forest, false: colors.line }}
             thumbColor={colors.white}
           />
@@ -96,14 +107,18 @@ export function DriverAccount() {
               </Text>
               {!editing ? (
                 <>
-                  <Text style={styles.green}>Base fare {inr(truck.price)} · ETA {truck.etaMin} min</Text>
+                  <Text style={styles.green}>
+                    Standard fare {inr(truck.price)}
+                    {truck.ratePerKm ? ` · ${inr(truck.ratePerKm)}/km` : ""} · ETA {truck.etaMin} min
+                  </Text>
                   <View style={{ marginTop: 12, flexDirection: "row" }}>
                     <OutlineButton label="Edit fare" icon="pencil-outline" onPress={startEdit} />
                   </View>
                 </>
               ) : (
                 <View style={{ marginTop: 10, gap: 12 }}>
-                  <Field label="Base fare (₹)" value={price} onChangeText={setPrice} keyboardType="number-pad" />
+                  <Field label="Standard fare (₹)" value={price} onChangeText={setPrice} keyboardType="number-pad" />
+                  <Field label="Per kilometre (₹)" value={ratePerKm} onChangeText={setRatePerKm} keyboardType="number-pad" />
                   <Field label="Typical ETA (minutes)" value={eta} onChangeText={setEta} keyboardType="number-pad" />
                   {error ? <Text style={styles.error}>{error}</Text> : null}
                   <PrimaryButton label="Save" onPress={save} loading={working} disabled={working} />
@@ -132,7 +147,7 @@ export function DriverAccount() {
           <OutlineButton label="Sign out" tone="danger" icon="log-out-outline" onPress={() => void signOut()} />
         </View>
         <Text style={styles.foot}>{APP_NAME} · Direct from Tamil Nadu farms</Text>
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }

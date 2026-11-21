@@ -16,6 +16,7 @@ import { registerForPush, unregisterPush } from "../lib/push";
 export type BuyerRegistration = {
   role: "BUYER";
   email: string;
+  emailCode: string;
   password: string;
   name: string;
   phone: string;
@@ -27,6 +28,7 @@ export type BuyerRegistration = {
 export type FarmerRegistration = {
   role: "FARMER";
   email: string;
+  emailCode: string;
   password: string;
   name: string;
   phone: string;
@@ -38,6 +40,7 @@ export type FarmerRegistration = {
 export type DriverRegistration = {
   role: "DRIVER";
   email: string;
+  emailCode: string;
   password: string;
   name: string;
   phone: string;
@@ -46,6 +49,7 @@ export type DriverRegistration = {
   capacityTons: number;
   body: "Open body" | "Closed body";
   price: number;
+  ratePerKm?: number;
 };
 
 export type RegisterInput = BuyerRegistration | FarmerRegistration | DriverRegistration;
@@ -61,6 +65,9 @@ type AuthState = {
   signUp: (input: RegisterInput) => Promise<void>;
   signOut: () => Promise<void>;
   retry: () => void;
+  /** True right after a farmer creates an account, until documents are submitted or skipped. */
+  justSignedUp: boolean;
+  clearSignup: () => void;
 };
 
 /** Tries before giving up on the startup /auth/me, and how long to wait between. */
@@ -78,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<ApiUser | null>(null);
+  const [justSignedUp, setJustSignedUp] = useState(false);
 
   const apply = useCallback(
     async (session: AuthSession) => {
@@ -100,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearToken();
     setToken(null);
     setUser(null);
+    setJustSignedUp(false);
     setOffline(false);
     qc.clear();
   }, [qc]);
@@ -175,9 +184,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(
     async (input: RegisterInput) => {
       await apply(await api<AuthSession>("/auth/register", { method: "POST", body: input }));
+      if (input.role === "FARMER") setJustSignedUp(true);
     },
     [apply],
   );
+
+  const clearSignup = useCallback(() => setJustSignedUp(false), []);
 
   const value = useMemo<AuthState>(
     () => ({
@@ -190,8 +202,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       retry,
+      justSignedUp,
+      clearSignup,
     }),
-    [ready, offline, token, user, signIn, signUp, signOut, retry],
+    [ready, offline, token, user, signIn, signUp, signOut, retry, justSignedUp, clearSignup],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

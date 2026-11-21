@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppHeader, Screen } from "../components/Chrome";
+import { FormScroll } from "../components/keyboard";
 import { MapView } from "../components/MapView";
 import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
 import { RatePrompt } from "../components/RatePrompt";
@@ -23,6 +24,7 @@ import { ApiError } from "../lib/api";
 import { inr, kg } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
+import { Avatar } from "../components/Avatar";
 
 export function ReviewBooking() {
   const { orderId, truckId } = useRoute<RouteProp<RootStackParamList, "ReviewBooking">>().params;
@@ -92,7 +94,7 @@ export function ReviewBooking() {
           <View style={{ flex: 1 }}>
             <Text style={styles.farm}>{truck.name}</Text>
             <Text style={styles.muted}>
-              {truck.driver?.name} · ★ {truck.driver?.rating.toFixed(1)}{" "}
+              {truck.driver?.name} · {truck.driver?.rating.toFixed(1)} rating{" "}
               <Text style={{ color: colors.forest }}>Verified driver</Text>
             </Text>
             <Text style={styles.green}>ETA {truck.etaMin} min</Text>
@@ -198,9 +200,15 @@ export function TrackTruck() {
           <View style={styles.waiting}>
             <ActivityIndicator color={colors.forest} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.farm}>Waiting for the driver to accept</Text>
+              <Text style={styles.farm}>
+                {booking.approvedAt ? "Waiting for the driver to accept" : "Waiting for approval"}
+              </Text>
               <Text style={styles.muted}>
-                {driver?.name} has been sent this trip. This updates the moment they accept.
+                {booking.approvedAt
+                  ? driver?.name
+                    ? `${driver.name} has this trip. It updates the moment they take it or pass.`
+                    : "This trip is open. The next driver who takes it will show up here."
+                  : "Uzhavan reviews the truck booking before a driver can take it."}
               </Text>
             </View>
           </View>
@@ -218,7 +226,7 @@ export function TrackTruck() {
 
         {driver && !cancelled ? (
           <View style={styles.row}>
-            <Image source={imageFor(driver.photoKey)} style={styles.avSm} />
+            <Avatar size={44} />
             <View style={{ flex: 1 }}>
               <Text style={styles.farm}>{driver.name}</Text>
               <Text style={styles.muted}>
@@ -309,8 +317,7 @@ export function DeliveryCompleted() {
         <PrimaryButton label="Back to My Orders" onPress={() => navigation.navigate("Tabs")} />
       }
     >
-      <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 16 }]}>
-        <Text style={{ fontSize: 64 }}>🏭</Text>
+      <FormScroll contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 16 }]}>
         <View style={styles.ok}>
           <Ionicons name="checkmark" size={22} color={colors.forest} />
         </View>
@@ -333,7 +340,7 @@ export function DeliveryCompleted() {
             <Text style={styles.muted}>Proof of delivery</Text>
             <View style={[styles.row, { marginTop: 8 }]}>
               <View style={styles.proofAvatar}>
-                <Ionicons name="person" size={18} color={colors.forest} />
+                <Ionicons name="person-outline" size={18} color={colors.ink} />
               </View>
               <View>
                 <Text style={styles.farm}>Received by {booking.proofReceivedBy}</Text>
@@ -357,7 +364,7 @@ export function DeliveryCompleted() {
             <RatePrompt orderId={booking.orderId} />
           </View>
         ) : null}
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }
@@ -374,7 +381,6 @@ const styles = StyleSheet.create({
   err: { marginTop: 8, textAlign: "center", fontSize: 12, color: colors.danger },
   img48: { width: 48, height: 48, borderRadius: 10 },
   img64: { width: 64, height: 56, borderRadius: 10 },
-  avSm: { width: 44, height: 44, borderRadius: 22 },
   callBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
   upi: { flexDirection: "row", alignItems: "center", gap: 8 },
   upiBadge: { backgroundColor: "#6C3BEF", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },

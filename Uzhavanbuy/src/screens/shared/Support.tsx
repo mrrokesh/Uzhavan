@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +21,7 @@ import { APP_KIND, APP_VERSION } from "../../lib/appInfo";
 import { ApiError } from "../../lib/api";
 import { TICKET_LABEL, type TicketCategory, type TicketStatus } from "../../api/types";
 import { colors, shadow } from "../../theme";
+import { FormScroll, ChatScroll } from "../../components/keyboard";
 
 const TONE: Record<TicketStatus, "amber" | "mint" | "neutral"> = {
   OPEN: "amber",
@@ -196,6 +197,9 @@ const CATEGORIES: { key: TicketCategory; label: string; icon: keyof typeof Ionic
   { key: "DELIVERY", label: "Delivery", icon: "car-outline" },
   { key: "VERIFICATION", label: "Verification", icon: "shield-checkmark-outline" },
   { key: "ACCOUNT", label: "My account", icon: "person-outline" },
+  { key: "COMPLAINT", label: "Complaint", icon: "alert-circle-outline" },
+  { key: "REFUND", label: "Refund", icon: "return-down-back-outline" },
+  { key: "URGENT_CROP", label: "Urgent crop", icon: "flash-outline" },
   { key: "APP_ISSUE", label: "App problem", icon: "bug-outline" },
   { key: "OTHER", label: "Something else", icon: "ellipsis-horizontal" },
 ];
@@ -233,12 +237,12 @@ export function NewTicket() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={<PrimaryButton label="Send to support" onPress={send} loading={working} disabled={working} />}
       >
         <AppHeader title="Raise an issue" />
-        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+        <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           <Text style={styles.section}>What’s this about?</Text>
           <View style={styles.chips}>
             {CATEGORIES.map((c) => (
@@ -299,7 +303,7 @@ export function NewTicket() {
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+        </FormScroll>
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -344,7 +348,7 @@ export function TicketDetail() {
   const closed = t.status === "CLOSED";
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           closed ? undefined : (
@@ -374,7 +378,7 @@ export function TicketDetail() {
         }
       >
         <AppHeader title={t.code} />
-        <ScrollView contentContainerStyle={styles.pad}>
+        <ChatScroll contentContainerStyle={styles.pad}>
           <Text style={styles.threadSubject}>{t.subject}</Text>
           <View style={[styles.row, { marginTop: 8 }]}>
             <Chip label={TICKET_LABEL[t.status]} tone={TONE[t.status]} />
@@ -406,8 +410,7 @@ export function TicketDetail() {
             </View>
           ) : null}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+          {error ? <Text style={styles.error}>{error}</Text> : null}        </ChatScroll>
       </Screen>
     </KeyboardAvoidingView>
   );

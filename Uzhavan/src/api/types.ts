@@ -1,5 +1,5 @@
 import type { ImageSourcePropType } from "react-native";
-import { imageFor, imagesFor } from "../lib/images";
+import { cropImage, imageFor, imagesFor } from "../lib/images";
 
 export type Role = "BUYER" | "FARMER" | "DRIVER";
 
@@ -39,6 +39,7 @@ export type ApiUser = {
   warehouse: string | null;
   warehouseAddress: string | null;
   market: string | null;
+  verification?: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
   createdAt: string;
 };
 
@@ -55,6 +56,8 @@ export type ApiFarm = {
   location: string;
   rating: number;
   avatarKey: string;
+  hasAvatar?: boolean;
+  avatarUpdatedAt?: string | null;
 };
 
 export type ApiCrop = {
@@ -77,6 +80,8 @@ export type ApiCrop = {
   hasVideo: boolean;
   imageKey: string;
   galleryKeys: string[];
+  hasCustomPhoto?: boolean;
+  photoUpdatedAt?: string | null;
   listed: boolean;
   sellerVerified?: boolean;
   distanceKm?: number | null;
@@ -88,6 +93,8 @@ export type CropSearch = {
   origin: string | null;
   radiusKm: number | null;
   count: number;
+  /** True when another page can be fetched with a larger offset. */
+  hasMore?: boolean;
   crops: ApiCrop[];
 };
 
@@ -122,6 +129,7 @@ export type ApiTruck = {
   capacityKg: number;
   etaMin: number;
   price: number;
+  ratePerKm?: number;
   photoKey: string;
   recommended: boolean;
   body: string;
@@ -253,6 +261,7 @@ export type FarmerSummary = {
 export type DriverSummary = {
   driver: ApiDriver;
   truck: ApiTruck | null;
+  papers?: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
   activeTrips: number;
   completedTrips: number;
   earnings: number;
@@ -286,6 +295,8 @@ export type Crop = {
   listed: boolean;
   imageKey: string;
   galleryKeys: string[];
+  hasCustomPhoto: boolean;
+  photoUpdatedAt: string | null;
   image: ImageSourcePropType;
   gallery: ImageSourcePropType[];
   avatar: ImageSourcePropType;
@@ -350,8 +361,12 @@ export function toCrop(c: ApiCrop): Crop {
     listed: c.listed,
     imageKey: c.imageKey,
     galleryKeys: c.galleryKeys,
-    image: imageFor(c.imageKey),
-    gallery: imagesFor(c.galleryKeys.length ? c.galleryKeys : [c.imageKey]),
+    hasCustomPhoto: Boolean(c.hasCustomPhoto),
+    photoUpdatedAt: c.photoUpdatedAt ?? null,
+    image: cropImage(c),
+    gallery: c.hasCustomPhoto
+      ? [cropImage(c), ...imagesFor(c.galleryKeys.length ? c.galleryKeys : [c.imageKey])]
+      : imagesFor(c.galleryKeys.length ? c.galleryKeys : [c.imageKey]),
     avatar: imageFor(c.farm.avatarKey),
     requestCount: c._count?.requests ?? 0,
     orderCount: c._count?.orders ?? 0,
@@ -518,6 +533,9 @@ export type TicketCategory =
   | "ACCOUNT"
   | "VERIFICATION"
   | "APP_ISSUE"
+  | "COMPLAINT"
+  | "REFUND"
+  | "URGENT_CROP"
   | "OTHER";
 
 export type Ticket = {
@@ -582,6 +600,12 @@ export type DemandBoard = {
     acceptRate: number;
     /** True when this farm lists nothing in a category buyers are asking for. */
     gap: boolean;
+    buyers?: {
+      id: string;
+      name: string;
+      business: string | null;
+      district: string | null;
+    }[];
   }[];
   buyers: {
     id: string;

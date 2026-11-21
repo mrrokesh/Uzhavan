@@ -2,11 +2,9 @@ import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Chip, OutlineButton, PrimaryButton } from "./ui";
-import { useDistricts } from "../api/hooks";
+import { DistrictPicker, RADIUS_OPTIONS } from "./LocationSheet";
 import type { CropFilters as Filters } from "../api/types";
 import { colors, shadow } from "../theme";
-
-const RADII = [50, 100, 200, 400] as const;
 
 const SORTS: { key: NonNullable<Filters["sort"]>; label: string }[] = [
   { key: "newest", label: "Newest" },
@@ -27,6 +25,7 @@ export function countActive(f: Filters): number {
   let n = 0;
   if (f.district) n += 1;
   if (f.radiusKm) n += 1;
+  if (f.category) n += 1;
   if (f.verifiedOnly) n += 1;
   if (f.minPrice !== undefined || f.maxPrice !== undefined) n += 1;
   if (f.sort && f.sort !== "newest") n += 1;
@@ -60,10 +59,14 @@ export function FilterBar({
       </Pressable>
 
       {filters.radiusKm && origin ? (
-        <Chip label={`📍 ${filters.radiusKm} km of ${origin}`} tone="mint" />
+        <Chip label={`${filters.radiusKm} km of ${filters.district ?? origin}`} tone="mint" />
+      ) : filters.district ? (
+        <Chip label={filters.district} tone="mint" />
       ) : origin ? (
-        <Chip label={`📍 ${origin}`} tone="mint" />
+        <Chip label={origin} tone="mint" />
       ) : null}
+
+      {filters.category ? <Chip label={filters.category} tone="mint" /> : null}
 
       {filters.verifiedOnly ? <Chip label="✓ Verified only" tone="mint" /> : null}
 
@@ -87,8 +90,8 @@ export function FilterSheet({
   onApply: (f: Filters) => void;
   onClose: () => void;
 }) {
-  const districts = useDistricts();
   const [draft, setDraft] = useState<Filters>(filters);
+  const [picking, setPicking] = useState(false);
 
   // Re-seed the draft each time the sheet opens.
   const open = () => setDraft(filters);
@@ -98,6 +101,7 @@ export function FilterSheet({
   );
 
   return (
+    <>
     <Modal
       visible={visible}
       animationType="slide"
@@ -118,35 +122,24 @@ export function FilterSheet({
 
           <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
             <Text style={styles.section}>Distance from</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowWrap}>
-              <Chip
-                label="My district"
-                active={!draft.district}
-                onPress={() => setDraft({ ...draft, district: undefined })}
-              />
-              {(districts.data ?? []).map((d) => (
-                <Chip
-                  key={d}
-                  label={d}
-                  active={draft.district === d}
-                  onPress={() => setDraft({ ...draft, district: d })}
-                />
-              ))}
-            </ScrollView>
+            <Pressable style={styles.pick} onPress={() => setPicking(true)}>
+              <Text style={styles.pickText}>{draft.district ?? "My district"}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.faint} />
+            </Pressable>
+            {draft.district ? (
+              <Pressable onPress={() => setDraft({ ...draft, district: undefined })} hitSlop={8}>
+                <Text style={styles.clear}>Use my saved district</Text>
+              </Pressable>
+            ) : null}
 
             <Text style={styles.section}>Within</Text>
             <View style={styles.wrap}>
-              <Chip
-                label="Anywhere"
-                active={!draft.radiusKm}
-                onPress={() => setDraft({ ...draft, radiusKm: undefined })}
-              />
-              {RADII.map((r) => (
+              {RADIUS_OPTIONS.map((r) => (
                 <Chip
-                  key={r}
-                  label={`${r} km`}
-                  active={draft.radiusKm === r}
-                  onPress={() => setDraft({ ...draft, radiusKm: r })}
+                  key={r.label}
+                  label={r.label}
+                  active={draft.radiusKm === r.km}
+                  onPress={() => setDraft({ ...draft, radiusKm: r.km })}
                 />
               ))}
             </View>
@@ -210,6 +203,13 @@ export function FilterSheet({
         </View>
       </View>
     </Modal>
+    <DistrictPicker
+      visible={picking}
+      selected={draft.district}
+      onSelect={(district) => setDraft({ ...draft, district })}
+      onClose={() => setPicking(false)}
+    />
+    </>
   );
 }
 
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: "#cfc8bc",
+    borderColor: "#D5D8D6",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
@@ -268,6 +268,18 @@ const styles = StyleSheet.create({
   boxOn: { backgroundColor: colors.forest, borderColor: colors.forest },
   toggleTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   hint: { marginTop: 3, fontSize: 12, lineHeight: 17, color: colors.muted },
+  pick: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pickText: { fontSize: 15, fontWeight: "600", color: colors.ink },
   footer: {
     flexDirection: "row",
     gap: 10,

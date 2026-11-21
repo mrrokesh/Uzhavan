@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { revealInput } from "./keyboard";
 import { colors, shadow } from "../theme";
 
 export function Card({
@@ -73,13 +74,18 @@ export function Field({
   multiline?: boolean;
 }) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
+  const inputRef = useRef<TextInput>(null);
   return (
     <View style={styles.field}>
       {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
       <View style={[styles.fieldBox, multiline && styles.fieldBoxTall]}>
         <TextInput
+          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
+          onFocus={() => {
+            setTimeout(() => revealInput(inputRef.current), 220);
+          }}
           placeholder={placeholder}
           placeholderTextColor={colors.faint}
           secureTextEntry={secureTextEntry ? hidden : false}
@@ -115,7 +121,7 @@ export function OutlineButton({
 }) {
   const color = tone === "danger" ? colors.danger : colors.forest;
   return (
-    <Pressable onPress={onPress} style={[styles.outline, { borderColor: tone === "danger" ? colors.danger : "#1B5E3B33" }]}>
+    <Pressable onPress={onPress} style={[styles.outline, { borderColor: tone === "danger" ? colors.danger : colors.line }]}>
       {icon ? <Ionicons name={icon} size={16} color={color} /> : null}
       <Text style={[styles.outlineText, { color }]}>{label}</Text>
     </Pressable>

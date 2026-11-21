@@ -1,4 +1,6 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
+import { IS_BUYER_APP } from "./appInfo";
 import { getToken } from "./session";
 
 /**
@@ -54,7 +56,29 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   if (!res.ok) {
     const issue = Array.isArray(data?.issues) ? data.issues[0]?.message : undefined;
     const message = issue || (data && (data.error as string)) || `Request failed (${res.status})`;
+    reportClientError(path, res.status, message);
     throw new ApiError(res.status, message);
   }
   return data as T;
+}
+
+function reportClientError(path: string, status: number, message: string) {
+  if (path.startsWith("/errors")) return;
+  const platform = Platform.OS === "ios" ? "IOS" : Platform.OS === "android" ? "ANDROID" : null;
+  if (!platform) return;
+  const token = getToken();
+  void fetch(`${API_BASE_URL}/api/errors`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      app: IS_BUYER_APP ? "BUYER" : "PARTNER",
+      platform,
+      message,
+      path,
+      status,
+    }),
+  }).catch(() => undefined);
 }

@@ -67,6 +67,13 @@ export const env = {
 
   /** Minutes a password-reset code stays valid. Short on purpose. */
   resetCodeMinutes: int("RESET_CODE_MINUTES", 15),
+
+  /** Rokesh Notify. The key stays on the server; the apps never see it. */
+  notifyApiKey: process.env.NOTIFY_API_KEY ?? "",
+  notifyBaseUrl: (process.env.NOTIFY_BASE_URL ?? "https://notifications.rokeshcloud.com").replace(/\/$/, ""),
+  notifyAppName: process.env.NOTIFY_APP_NAME ?? "MR Rokesh Softwares",
+  notifyFrom:
+    process.env.NOTIFY_FROM ?? "MR Rokesh Softwares <noreply@notifications.rokeshcloud.com>",
 };
 
 // A wide-open CORS policy is fine in dev and dangerous in production.

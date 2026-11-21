@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppHeader, Screen } from "../components/Chrome";
+import { FormScroll } from "../components/keyboard";
 import { MapView } from "../components/MapView";
 import { Chip, Divider, InfoNote, OutlineButton, PrimaryButton, Row } from "../components/ui";
 import { RatePrompt } from "../components/RatePrompt";
@@ -200,7 +201,9 @@ export function TrackTruck() {
             <View style={{ flex: 1 }}>
               <Text style={styles.farm}>Waiting for the driver to accept</Text>
               <Text style={styles.muted}>
-                {driver?.name} has been sent this trip. This updates the moment they accept.
+                {driver?.name
+                  ? `${driver.name} has this trip. It updates the moment they take it or pass.`
+                  : "This trip is open. The next driver who takes it will show up here."}
               </Text>
             </View>
           </View>
@@ -309,7 +312,7 @@ export function DeliveryCompleted() {
         <PrimaryButton label="Back to My Orders" onPress={() => navigation.navigate("Tabs")} />
       }
     >
-      <ScrollView contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 16 }]}>
+      <FormScroll contentContainerStyle={[styles.pad, { alignItems: "center", paddingTop: 16 }]}>
         <Text style={{ fontSize: 64 }}>🏭</Text>
         <View style={styles.ok}>
           <Ionicons name="checkmark" size={22} color={colors.forest} />
@@ -357,7 +360,7 @@ export function DeliveryCompleted() {
             <RatePrompt orderId={booking.orderId} />
           </View>
         ) : null}
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }

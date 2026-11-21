@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +15,7 @@ import { Field } from "../../components/ui";
 import { useAskAssistant } from "../../api/hooks";
 import { ApiError } from "../../lib/api";
 import { colors, shadow } from "../../theme";
+import { ChatScroll } from "../../components/keyboard";
 
 const SUGGESTIONS = ["What crops are available?", "Who's available for delivery?", "What's my payment status?"];
 
@@ -50,7 +51,7 @@ export function Assistant() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           <View style={styles.replyRow}>
@@ -77,7 +78,7 @@ export function Assistant() {
         }
       >
         <AppHeader title="Ask Uzhavan" />
-        <ScrollView contentContainerStyle={styles.pad}>
+        <ChatScroll contentContainerStyle={styles.pad}>
           {turns.length === 0 ? (
             <>
               <Text style={styles.lead}>
@@ -106,8 +107,7 @@ export function Assistant() {
                 </View>
               ))}
             </View>
-          )}
-        </ScrollView>
+          )}        </ChatScroll>
       </Screen>
     </KeyboardAvoidingView>
   );

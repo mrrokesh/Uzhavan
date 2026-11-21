@@ -66,7 +66,7 @@ export function DriverJobs() {
                 : "No truck registered"}
             </Text>
           </View>
-          <Text style={{ fontSize: 40 }}>🚚</Text>
+          <Ionicons name="bus-outline" size={22} color={colors.ink} />
         </View>
 
         <View style={styles.stats}>

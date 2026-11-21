@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
+
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +16,7 @@ import { ApiError } from "../../lib/api";
 import { inr, kg } from "../../lib/format";
 import { colors, shadow } from "../../theme";
 import type { Payout, PayoutState } from "../../api/types";
+import { FormScroll } from "../../components/keyboard";
 
 const TONE: Record<PayoutState, "mint" | "amber" | "neutral"> = {
   PAID: "mint",
@@ -87,7 +88,7 @@ export function FarmerPayouts() {
   // ── No bank account yet ──────────────────────────────────────
   if (d && !d.account) {
     return (
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }}>
         <Screen
           footer={
             <PrimaryButton
@@ -99,7 +100,7 @@ export function FarmerPayouts() {
           }
         >
           <AppHeader title="Where should we pay you?" />
-          <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+          <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
             <Text style={styles.lead}>
               Buyers pay Uzhavan up front. To pass your share on we need the account it should land
               in.
@@ -145,7 +146,7 @@ export function FarmerPayouts() {
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-          </ScrollView>
+          </FormScroll>
         </Screen>
       </KeyboardAvoidingView>
     );

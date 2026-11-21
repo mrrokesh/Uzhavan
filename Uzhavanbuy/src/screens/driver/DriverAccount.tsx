@@ -12,6 +12,8 @@ import { ApiError } from "../../lib/api";
 import { inr } from "../../lib/format";
 import { APP_NAME } from "../../lib/appInfo";
 import { colors, shadow } from "../../theme";
+import { Avatar } from "../../components/Avatar";
+import { FormScroll } from "../../components/keyboard";
 
 export function DriverAccount() {
   const { user, signOut } = useAuth();
@@ -58,15 +60,15 @@ export function DriverAccount() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+      <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         <Logo compact />
 
         <View style={[styles.card, styles.row, { marginTop: 12 }]}>
-          <Image source={imageFor(driver?.photoKey ?? user?.avatarKey)} style={styles.av} />
+          <Avatar size={56} />
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{driver?.name ?? user?.name}</Text>
             <Text style={styles.muted}>
-              ★ {driver?.rating.toFixed(1)} · {driver?.trips} trips
+              {driver?.rating.toFixed(1)} rating · {driver?.trips} trips
             </Text>
           </View>
           {driver?.verified ? <Chip label="Verified" tone="mint" /> : null}
@@ -132,7 +134,7 @@ export function DriverAccount() {
           <OutlineButton label="Sign out" tone="danger" icon="log-out-outline" onPress={() => void signOut()} />
         </View>
         <Text style={styles.foot}>{APP_NAME} · Direct from Tamil Nadu farms</Text>
-      </ScrollView>
+      </FormScroll>
     </Screen>
   );
 }
@@ -172,7 +174,6 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16, paddingBottom: 32 },
   card: { marginBottom: 12, backgroundColor: colors.white, borderRadius: 16, padding: 14, ...shadow },
   row: { flexDirection: "row", gap: 12, alignItems: "center" },
-  av: { width: 56, height: 56, borderRadius: 28 },
   truckImg: { width: "100%", height: 130 },
   title: { fontSize: 16, fontWeight: "600", color: colors.ink },
   body: { fontSize: 13.5, fontWeight: "500", color: colors.ink },

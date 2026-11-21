@@ -1,4 +1,5 @@
 import { Router } from "express";
+import sharp from "sharp";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireFarm } from "../session.js";
@@ -169,6 +170,107 @@ farmerRouter.patch(
   }),
 );
 
+const photoBody = z.object({
+  data: z.string().min(16, "That photo didn't come through"),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]).default("image/jpeg"),
+});
+
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Phones send full-resolution pictures; the apps show them at a few hundred
+ * pixels. Shrinking here, once, means every later read from the (remote)
+ * database and every download over mobile data is a fraction of the size.
+ */
+async function shrink(bytes: Buffer, maxEdge: number) {
+  try {
+    const data = await sharp(bytes)
+      .rotate()
+      .resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 78, mozjpeg: true })
+      .toBuffer();
+    return { data, mimeType: "image/jpeg" as const };
+  } catch {
+    throw new HttpError(400, "That file isn't a picture we can read");
+  }
+}
+
+farmerRouter.put(
+  "/crops/:id/photo",
+  asyncHandler(async (req, res) => {
+    const crop = await ownCrop(req, String(req.params.id));
+    const body = photoBody.parse(req.body);
+    const bytes = Buffer.from(body.data, "base64");
+    if (bytes.length < 32 || bytes.length > MAX_PHOTO_BYTES) {
+      throw new HttpError(400, "Photo must be a picture under 2 MB");
+    }
+    const img = await shrink(bytes, 1000);
+    await prisma.cropPhoto.upsert({
+      where: { cropId: crop.id },
+      create: { cropId: crop.id, mimeType: img.mimeType, data: img.data },
+      update: { mimeType: img.mimeType, data: img.data },
+    });
+    const updated = await prisma.crop.update({
+      where: { id: crop.id },
+      data: { hasCustomPhoto: true, photoUpdatedAt: new Date() },
+      include: { farm: true },
+    });
+    res.json(updated);
+  }),
+);
+
+farmerRouter.delete(
+  "/crops/:id/photo",
+  asyncHandler(async (req, res) => {
+    const crop = await ownCrop(req, String(req.params.id));
+    await prisma.cropPhoto.deleteMany({ where: { cropId: crop.id } });
+    const updated = await prisma.crop.update({
+      where: { id: crop.id },
+      data: { hasCustomPhoto: false, photoUpdatedAt: null },
+      include: { farm: true },
+    });
+    res.json(updated);
+  }),
+);
+
+farmerRouter.put(
+  "/farm/avatar",
+  asyncHandler(async (req, res) => {
+    const { farm } = await requireFarm(req);
+    const body = photoBody.parse(req.body);
+    const bytes = Buffer.from(body.data, "base64");
+    if (bytes.length < 32 || bytes.length > MAX_PHOTO_BYTES) {
+      throw new HttpError(400, "Photo must be a picture under 2 MB");
+    }
+    const img = await shrink(bytes, 400);
+    await prisma.farmAvatar.upsert({
+      where: { farmId: farm.id },
+      create: { farmId: farm.id, mimeType: img.mimeType, data: img.data },
+      update: { mimeType: img.mimeType, data: img.data },
+    });
+    res.json(
+      await prisma.farm.update({
+        where: { id: farm.id },
+        data: { hasAvatar: true, avatarUpdatedAt: new Date() },
+      }),
+    );
+  }),
+);
+
+farmerRouter.delete(
+  "/farm/avatar",
+  asyncHandler(async (req, res) => {
+    const { farm } = await requireFarm(req);
+    await prisma.farmAvatar.deleteMany({ where: { farmId: farm.id } });
+    res.json(
+      await prisma.farm.update({
+        where: { id: farm.id },
+        data: { hasAvatar: false, avatarUpdatedAt: null },
+      }),
+    );
+  }),
+);
+
 farmerRouter.delete(
   "/crops/:id",
   asyncHandler(async (req, res) => {
@@ -323,10 +425,8 @@ const demandQuery = z.object({
  * What buyers in the region are actually buying — the mirror of the buyer's
  * crop feed, so a farmer can decide what's worth listing.
  *
- * Deliberately aggregate. Individual requests are a private negotiation
- * between one buyer and one farm; showing them to a competing farm would leak
- * commercial information. What's safe to share is the shape of demand and a
- * directory of buyers who are open for business.
+ * The totals stay aggregate. A farm can see who asked for a crop, so they
+ * can list it or reply, but not the quantity or price of any one deal.
  */
 farmerRouter.get(
   "/demand",
@@ -354,6 +454,7 @@ farmerRouter.get(
           finalPricePerKg: true,
           status: true,
           crop: { select: { category: true, title: true, pricePerKg: true } },
+          buyer: { select: { id: true, name: true, business: true, district: true } },
         },
       }),
       prisma.user.findMany({
@@ -373,10 +474,15 @@ farmerRouter.get(
       prisma.crop.findMany({ where: { farmId: farm.id }, select: { category: true } }),
     ]);
 
-    // Roll requests up by category.
+    // Roll requests up by category. Buyers are named so the farm can reply,
+    // but not with the quantity or price of any one deal.
     const byCategory = new Map<
       string,
       { category: string; requests: number; totalKg: number; priceSum: number; priceN: number; accepted: number }
+    >();
+    const buyersByCategory = new Map<
+      string,
+      Map<string, { id: string; name: string; business: string | null; district: string | null }>
     >();
     for (const r of requests) {
       const key = r.crop.category;
@@ -390,6 +496,14 @@ farmerRouter.get(
       row.priceN += 1;
       if (r.status === "CONFIRMED" || r.status === "FARMER_ACCEPTED") row.accepted += 1;
       byCategory.set(key, row);
+      const people = buyersByCategory.get(key) ?? new Map();
+      people.set(r.buyer.id, {
+        id: r.buyer.id,
+        name: r.buyer.name,
+        business: r.buyer.business,
+        district: r.buyer.district,
+      });
+      buyersByCategory.set(key, people);
     }
 
     const mine = new Set(myCategories.map((c) => c.category));
@@ -402,6 +516,7 @@ farmerRouter.get(
         acceptRate: t.requests ? Math.round((t.accepted / t.requests) * 100) : 0,
         /// True when this farm doesn't list anything in a category buyers want.
         gap: !mine.has(t.category),
+        buyers: [...(buyersByCategory.get(t.category)?.values() ?? [])].slice(0, 5),
       }))
       .sort((a, b) => b.totalKg - a.totalKg);
 

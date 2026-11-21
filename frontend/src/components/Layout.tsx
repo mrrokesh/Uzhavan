@@ -57,12 +57,22 @@ export function Layout() {
             </NavLink>
           )}
           {can("USERS_VIEW") && <NavLink to="/accounts">Accounts</NavLink>}
+          {can("ORDERS_VIEW") && (
+            <NavLink to="/trucks">
+              Truck approvals
+              {(overview.data?.truckQueue ?? 0) > 0 && <span className="count">{overview.data?.truckQueue}</span>}
+            </NavLink>
+          )}
           {can("ORDERS_VIEW") && <NavLink to="/tracking">Track a vehicle</NavLink>}
           {can("ORDERS_VIEW") && <NavLink to="/payouts">Farmer payouts</NavLink>}
 
           <div className="nav-section">Platform</div>
           <NavLink to="/settings">Settings</NavLink>
           {can("CONFIG_WRITE") && <NavLink to="/announcements">Announcements</NavLink>}
+          <NavLink to="/errors">
+            App errors
+            {(overview.data?.errorsToday ?? 0) > 0 && <span className="count">{overview.data?.errorsToday}</span>}
+          </NavLink>
           <NavLink to="/releases">App updates</NavLink>
           {session?.isAdmin && <NavLink to="/payments">Payments</NavLink>}
           {can("ADMIN_STAFF_MANAGE") && <NavLink to="/staff">Staff</NavLink>}

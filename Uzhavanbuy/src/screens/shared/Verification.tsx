@@ -4,7 +4,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Platform,
+
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,12 +15,14 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { AppHeader, Screen } from "../../components/Chrome";
+import { DateField } from "../../components/DateField";
 import { Chip, Field, InfoNote, OutlineButton, PrimaryButton } from "../../components/ui";
 import { useSubmitVerification, useVerification } from "../../api/hooks";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/api";
 import type { DocumentType, UploadDoc } from "../../api/types";
 import { colors, shadow } from "../../theme";
+import { FormScroll } from "../../components/keyboard";
 
 /** Roughly the server's 5 MB cap, allowing for base64 inflation. */
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -38,9 +40,6 @@ const LABELS: Partial<Record<DocumentType, string>> = {
   VEHICLE_INSURANCE: "Insurance certificate",
   VEHICLE_PERMIT: "Goods carriage permit",
 };
-
-/** yyyy-mm-dd, which is what the server's z.string().date() wants. */
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function Verification() {
   const navigation = useNavigation();
@@ -134,15 +133,6 @@ export function Verification() {
     if (docs.length === 0) {
       setError("Attach at least one document");
       return;
-    }
-    for (const [label, value] of [
-      ["Insurance expiry", insuranceExpiry],
-      ["Permit expiry", permitExpiry],
-    ] as const) {
-      if (isDriver && value.trim() && !ISO_DATE.test(value.trim())) {
-        setError(`${label} should be written as YYYY-MM-DD`);
-        return;
-      }
     }
 
     const value = idNumber.trim().toUpperCase();
@@ -241,7 +231,7 @@ export function Verification() {
   const required: DocumentType[] = s?.required.documents ?? [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }}>
       <Screen
         footer={
           <PrimaryButton
@@ -253,7 +243,7 @@ export function Verification() {
         }
       >
         <AppHeader title="Get verified" />
-        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+        <FormScroll contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           {s?.status === "REJECTED" ? (
             <View style={{ marginBottom: 16 }}>
               <InfoNote tone="amber">
@@ -307,26 +297,26 @@ export function Verification() {
                 autoCapitalize="characters"
               />
               <View style={{ marginTop: 14 }}>
-                <Field
+                <DateField
                   label="Insurance valid until (optional)"
                   value={insuranceExpiry}
-                  onChangeText={setInsuranceExpiry}
-                  placeholder="2027-03-31"
-
+                  onChange={setInsuranceExpiry}
+                  storage="iso"
+                  minToday={false}
                 />
               </View>
               <View style={{ marginTop: 14 }}>
-                <Field
+                <DateField
                   label="Permit valid until (optional)"
                   value={permitExpiry}
-                  onChangeText={setPermitExpiry}
-                  placeholder="2027-03-31"
-
+                  onChange={setPermitExpiry}
+                  storage="iso"
+                  minToday={false}
                 />
               </View>
               <Text style={styles.hint}>
-                Dates as YYYY-MM-DD. We use them to warn you before cover lapses — an expired
-                insurance or permit means the truck can’t legally carry goods.
+                We use these dates to warn you before cover lapses — an expired insurance or permit
+                means the truck can’t legally carry goods.
               </Text>
             </>
           ) : null}
@@ -385,7 +375,7 @@ export function Verification() {
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+        </FormScroll>
       </Screen>
     </KeyboardAvoidingView>
   );

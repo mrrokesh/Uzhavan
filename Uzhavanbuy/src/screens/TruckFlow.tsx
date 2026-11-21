@@ -12,6 +12,7 @@ import { imageFor } from "../lib/images";
 import { inr, kg } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
+import { Avatar } from "../components/Avatar";
 
 /** Orders that still need transport arranged. */
 function useTransportable() {
@@ -37,17 +38,18 @@ export function BookTrackHome() {
       <ScrollView contentContainerStyle={styles.pad}>
         <View style={styles.top}>
           <Logo />
-          <View style={styles.bell}>
+          <Pressable style={styles.bell} onPress={() => navigation.navigate("Notifications")} accessibilityLabel="Notifications">
             <Ionicons name="notifications-outline" size={18} color={colors.ink} />
-          </View>
+          </Pressable>
         </View>
 
         <View style={styles.hero}>
           <View style={{ flex: 1 }}>
             <Text style={styles.h1}>Book a truck</Text>
-            <Text style={styles.muted}>Move your purchased crops safely.</Text>
+            <Text style={styles.muted}>
+              Confirmed orders that still need a vehicle. Drivers join in the Uzhavan app, set a standard fare, and take or leave each trip.
+            </Text>
           </View>
-          <Text style={{ fontSize: 48 }}>🚚</Text>
         </View>
 
         {orders.isLoading ? <ActivityIndicator color={colors.forest} style={{ marginTop: 32 }} /> : null}
@@ -62,7 +64,7 @@ export function BookTrackHome() {
         {rows.map((o) => (
           <View key={o.id} style={styles.card}>
             <View style={{ flexDirection: "row" }}>
-              <Chip label="🌱 Ready for pickup" tone="mint" />
+              <Chip label="Ready for pickup" tone="mint" />
             </View>
             <View style={styles.row}>
               <Image source={imageFor(o.crop?.imageKey)} style={styles.img64} />
@@ -79,9 +81,6 @@ export function BookTrackHome() {
           </View>
         ))}
 
-        <Benefit icon="👨‍🌾" title="Direct from farmers" text="Crops move from farm to your warehouse — no middlemen." />
-        <Benefit icon="🚚" title="Local truck network" text="Verified drivers, online right now, near the farm." />
-        <Benefit icon="✅" title="Safe & reliable" text="Insured trucks, live tracking, and proof of delivery." />
       </ScrollView>
     </Screen>
   );
@@ -181,7 +180,7 @@ export function PickupDelivery() {
       }
     >
       <AppHeader title="Pickup & delivery" />
-      <View style={{ height: 280 }}>
+      <View style={{ height: 168 }}>
         <MapView variant="route" pickupLabel={order.pickup} dropLabel={order.destination} />
       </View>
       <View style={styles.pad}>
@@ -262,7 +261,8 @@ export function NearbyTrucks() {
                     {small ? <Chip label="Too small" /> : null}
                   </View>
                   <Text style={styles.tiny}>
-                    {t.driver?.name} · ★ {t.driver?.rating.toFixed(1)}
+                    {t.driver?.name}
+                    {t.driver ? ` · ${t.driver.rating.toFixed(1)} rating` : ""}
                   </Text>
                   <Text style={styles.muted}>
                     {t.capacityTons} ton capacity
@@ -273,7 +273,7 @@ export function NearbyTrucks() {
               </Pressable>
             );
           })}
-          <Text style={styles.trust}>✓ All trucks are verified and insured.</Text>
+          <Text style={styles.trust}>Listed drivers are verified before they take a load.</Text>
         </View>
       </ScrollView>
     </Screen>
@@ -309,11 +309,11 @@ export function TruckDetails() {
       <ScrollView contentContainerStyle={styles.pad}>
         {truck.driver ? (
           <View style={[styles.card, styles.row]}>
-            <Image source={truck.driver.photo} style={styles.av} />
+            <Avatar size={56} />
             <View style={{ flex: 1 }}>
               <Text style={styles.h2}>{truck.driver.name}</Text>
               <Text style={styles.muted}>
-                ★ {truck.driver.rating.toFixed(1)} ({truck.driver.trips} trips)
+                {truck.driver.rating.toFixed(1)} rating · {truck.driver.trips} trips
               </Text>
             </View>
             {truck.driver.verified ? <Chip label="Verified driver" tone="mint" /> : null}
@@ -330,39 +330,24 @@ export function TruckDetails() {
           </View>
         </View>
 
-        <View style={styles.fit}>
-          <Text style={{ fontSize: 28 }}>👜</Text>
-          <Text style={[styles.farm, { color: colors.forest, flex: 1 }]}>
-            Fits {kg(order.quantityKg)} — this truck can carry up to {kg(truck.capacityKg)}.
-          </Text>
+        <View style={styles.card}>
+          <RowLine label="This load" value={kg(order.quantityKg)} />
+          <RowLine label="Truck capacity" value={kg(truck.capacityKg)} />
+          <RowLine label="Body" value={truck.body} />
+          <RowLine label="Plate" value={truck.plate} />
+          <RowLine label="Standard fare" value={inr(truck.price)} />
+          {truck.ratePerKm ? <RowLine label="Per kilometre" value={inr(truck.ratePerKm)} /> : null}
         </View>
-
-        <Text style={[styles.title, { marginTop: 20 }]}>What’s included</Text>
-        {[
-          "Loading assistance — Driver will help with loading.",
-          "Phone support — Support during pickup & delivery.",
-          "Goods protection — Safe transport for your crops.",
-        ].map((t) => (
-          <View key={t} style={styles.inc}>
-            <View style={styles.incDot}>
-              <Ionicons name="checkmark" size={13} color={colors.forest} />
-            </View>
-            <Text style={styles.body}>{t}</Text>
-          </View>
-        ))}
       </ScrollView>
     </Screen>
   );
 }
 
-function Benefit({ icon, title, text }: { icon: string; title: string; text: string }) {
+function RowLine({ label, value }: { label: string; value: string }) {
   return (
-    <View style={[styles.row, { marginTop: 16 }]}>
-      <Text style={{ fontSize: 20 }}>{icon}</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.farm}>{title}</Text>
-        <Text style={styles.muted}>{text}</Text>
-      </View>
+    <View style={styles.between}>
+      <Text style={styles.muted}>{label}</Text>
+      <Text style={styles.farm}>{value}</Text>
     </View>
   );
 }
@@ -395,7 +380,6 @@ const styles = StyleSheet.create({
   between: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   img64: { width: 64, height: 64, borderRadius: 12 },
   img56: { width: 56, height: 56, borderRadius: 10 },
-  av: { width: 56, height: 56, borderRadius: 28 },
   wh: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.amberBg, alignItems: "center", justifyContent: "center" },
   sheet: { marginTop: -12, backgroundColor: colors.cream, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16 },
   handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#d7d0c4", marginBottom: 12 },

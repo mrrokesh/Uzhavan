@@ -9,6 +9,18 @@ export const bookingsRouter = Router();
 const LOADING_FEE = 350;
 const PROTECTION_FEE = 200;
 
+/** The driver's standard fare is the floor. A per-km rate raises it on longer runs. */
+function tripFare(truck: { price: number; ratePerKm: number }, distanceKm: number) {
+  const running = truck.ratePerKm > 0 ? truck.ratePerKm * Math.max(distanceKm, 1) : 0;
+  const baseFare = Math.max(truck.price, running);
+  return {
+    baseFare,
+    loadingFee: LOADING_FEE,
+    protectionFee: PROTECTION_FEE,
+    total: baseFare + LOADING_FEE + PROTECTION_FEE,
+  };
+}
+
 const withRelations = {
   truck: true,
   driver: { include: { user: { select: { phone: true } } } },
@@ -41,12 +53,7 @@ bookingsRouter.get(
     const { truckId } = quoteQuery.parse(req.query);
     const truck = await prisma.truck.findUnique({ where: { id: truckId } });
     if (!truck) throw new HttpError(404, "Truck not found");
-    res.json({
-      baseFare: truck.price,
-      loadingFee: LOADING_FEE,
-      protectionFee: PROTECTION_FEE,
-      total: truck.price + LOADING_FEE + PROTECTION_FEE,
-    });
+    res.json(tripFare(truck, 57));
   }),
 );
 
@@ -74,6 +81,7 @@ bookingsRouter.post(
       throw new HttpError(400, `${truck.name} cannot carry ${order.quantityKg} kg`);
     }
     if (!truck.driver.online) throw new HttpError(409, "That driver just went offline");
+    if (!truck.driver.verified) throw new HttpError(409, "That driver is still waiting on document approval");
 
     const busy = await prisma.truckBooking.count({
       where: {
@@ -91,10 +99,7 @@ bookingsRouter.post(
         driverId: truck.driverId,
         pickup: order.pickup,
         destination: order.destination,
-        baseFare: truck.price,
-        loadingFee: LOADING_FEE,
-        protectionFee: PROTECTION_FEE,
-        total: truck.price + LOADING_FEE + PROTECTION_FEE,
+        ...tripFare(truck, 57),
       },
       include: withRelations,
     });

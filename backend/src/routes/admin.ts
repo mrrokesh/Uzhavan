@@ -377,23 +377,120 @@ adminRouter.get(
   "/overview",
   asyncHandler(async (req, res) => {
     await requireStaff(req);
-    const [users, pendingKyc, blocked, openTickets, unassigned, orders] = await Promise.all([
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [users, pendingKyc, verifiedFarmers, blocked, openTickets, unassigned, orders, commission, bookings, truckQueue, errors, listedCrops] =
+      await Promise.all([
       prisma.user.groupBy({ by: ["role"], _count: true }),
       prisma.user.count({ where: { verification: "PENDING" } }),
+      prisma.user.count({ where: { role: "FARMER", verification: "VERIFIED" } }),
       prisma.user.count({ where: { status: { in: ["BLOCKED", "SUSPENDED"] } } }),
       prisma.ticket.count({ where: { status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS"] } } }),
       prisma.ticket.count({ where: { assignedToId: null, status: "OPEN" } }),
-      prisma.order.aggregate({ _count: true, _sum: { value: true } }),
+      prisma.order.aggregate({ _count: true, _sum: { value: true, platformFee: true } }),
+      prisma.order.aggregate({ _sum: { platformFee: true }, where: { paidAt: { not: null } } }),
+      prisma.truckBooking.groupBy({ by: ["status"], _count: true }),
+      prisma.truckBooking.count({ where: { status: "PAID", approvedAt: null } }),
+      prisma.clientReport.count({ where: { createdAt: { gte: since } } }),
+      prisma.crop.count({ where: { listed: true } }),
     ]);
 
     res.json({
       users: Object.fromEntries(users.map((u) => [u.role, u._count])),
       pendingKyc,
+      verifiedFarmers,
       blocked,
       openTickets,
       unassignedTickets: unassigned,
       orderCount: orders._count,
       gmv: orders._sum.value ?? 0,
+      commission: commission._sum.platformFee ?? 0,
+      commissionRate: 5,
+      bookings: Object.fromEntries(bookings.map((b) => [b.status, b._count])),
+      truckQueue,
+      errorsToday: errors,
+      listedCrops,
     });
+  }),
+);
+
+adminRouter.get(
+  "/errors",
+  asyncHandler(async (req, res) => {
+    await requireStaff(req);
+    const rows = await prisma.clientReport.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    res.json(rows);
+  }),
+);
+
+adminRouter.get(
+  "/trucks/pending",
+  asyncHandler(async (req, res) => {
+    await requirePermission(req, "ORDERS_VIEW");
+    const rows = await prisma.truckBooking.findMany({
+      where: { status: "PAID", approvedAt: null },
+      orderBy: { paidAt: "asc" },
+      include: {
+        order: { select: { code: true, product: true, quantityKg: true, buyer: { select: { name: true, business: true } } } },
+        driver: { select: { name: true } },
+        truck: { select: { name: true, plate: true, price: true } },
+      },
+    });
+    res.json(rows);
+  }),
+);
+
+adminRouter.post(
+  "/trucks/:id/approve",
+  asyncHandler(async (req, res) => {
+    const reviewer = await requirePermission(req, "ORDERS_VIEW");
+    const booking = await prisma.truckBooking.findUnique({ where: { id: String(req.params.id) } });
+    if (!booking || booking.status !== "PAID") throw new HttpError(404, "Booking not found");
+    if (booking.approvedAt) throw new HttpError(409, "This booking is already approved");
+    const updated = await prisma.truckBooking.update({
+      where: { id: booking.id },
+      data: { approvedAt: new Date(), approvedById: reviewer.id },
+    });
+    await audit({
+      actorId: reviewer.id,
+      action: "TRUCK_APPROVED",
+      targetType: "TruckBooking",
+      targetId: booking.id,
+      summary: `Approved truck booking ${booking.code}`,
+    });
+    res.json(updated);
+  }),
+);
+
+adminRouter.post(
+  "/trucks/:id/reject",
+  asyncHandler(async (req, res) => {
+    const reviewer = await requirePermission(req, "ORDERS_VIEW");
+    const reason = z.string().trim().min(3).max(200).parse(req.body?.reason);
+    const booking = await prisma.truckBooking.findUnique({ where: { id: String(req.params.id) } });
+    if (!booking || booking.status !== "PAID" || booking.approvedAt) {
+      throw new HttpError(409, "This booking can no longer be rejected");
+    }
+    const updated = await prisma.$transaction(async (tx) => {
+      const b = await tx.truckBooking.update({
+        where: { id: booking.id },
+        data: { status: "CANCELLED", cancelReason: reason, approvedById: reviewer.id },
+      });
+      await tx.order.update({ where: { id: booking.orderId }, data: { status: "AWAITING_TRUCK" } });
+      await tx.bookingEvent.create({
+        data: { bookingId: booking.id, status: "CANCELLED", note: `Not approved — ${reason}` },
+      });
+      return b;
+    });
+    await audit({
+      actorId: reviewer.id,
+      action: "TRUCK_REJECTED",
+      targetType: "TruckBooking",
+      targetId: booking.id,
+      summary: `Rejected truck booking ${booking.code} — ${reason}`,
+    });
+    res.json(updated);
   }),
 );

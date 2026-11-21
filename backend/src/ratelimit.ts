@@ -97,6 +97,10 @@ export const LIMITS = {
   forgotTarget: { max: 10, windowMs: 15 * 60 * 1000 },
   resetAttempt: { max: 30, windowMs: 15 * 60 * 1000 },
   register: { max: 20, windowMs: 60 * 60 * 1000 },
+  /** Asking Notify to mail a code. Per address, and again per inbox. */
+  emailOtp: { max: 20, windowMs: 15 * 60 * 1000 },
+  emailOtpTarget: { max: 5, windowMs: 15 * 60 * 1000 },
+  clientError: { max: 30, windowMs: 10 * 60 * 1000 },
 } as const;
 
 // ---- Per-account lockout ---------------------------------------------------

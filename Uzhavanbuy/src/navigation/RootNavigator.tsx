@@ -39,6 +39,7 @@ import { FarmerRequests } from "../screens/farmer/Requests";
 import { FarmerRequestDetail } from "../screens/farmer/RequestDetail";
 import { FarmerAccount } from "../screens/farmer/FarmerAccount";
 import { Demand } from "../screens/farmer/Demand";
+import { BuyerDetail } from "../screens/farmer/BuyerDetail";
 import { FarmerPayouts } from "../screens/farmer/Payouts";
 
 // Driver
@@ -130,9 +131,9 @@ function tabOptions(icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof
     tabBarInactiveTintColor: colors.faint,
     tabBarLabelStyle: { fontSize: 10, fontWeight: "600" as const },
     tabBarStyle: { backgroundColor: colors.white, borderTopColor: colors.line },
-    tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => {
+    tabBarIcon: ({ color }: { color: string }) => {
       const pair = icons[route.name];
-      return <Ionicons name={focused ? pair[0] : pair[1]} size={22} color={color} />;
+      return <Ionicons name={pair[1]} size={20} color={color} />;
     },
   });
 }
@@ -150,7 +151,7 @@ function BuyerTabs() {
       })}
     >
       <BuyerTab.Screen name="Home" component={HomeFeed} />
-      <BuyerTab.Screen name="BookTrack" component={BookTrackHome} options={{ title: "Book Track" }} />
+      <BuyerTab.Screen name="BookTrack" component={BookTrackHome} options={{ title: "Trucks" }} />
       <BuyerTab.Screen name="Orders" component={MyOrders} options={{ title: "My Orders" }} />
       <BuyerTab.Screen name="Profile" component={Profile} />
     </BuyerTab.Navigator>
@@ -201,7 +202,7 @@ function FarmerTabs() {
     <FarmerTab.Navigator
       screenOptions={tabOptions({
         FarmerHome: ["home", "home-outline"],
-        Listings: ["leaf", "leaf-outline"],
+        Listings: ["grid", "grid-outline"],
         Requests: ["mail", "mail-outline"],
         FarmerAccount: ["person", "person-outline"],
       })}
@@ -228,6 +229,7 @@ function FarmerApp() {
       <FarmerStack.Screen name="Announcements" component={Announcements} />
       <FarmerStack.Screen name="Notifications" component={Notifications} />
       <FarmerStack.Screen name="Demand" component={Demand} />
+      <FarmerStack.Screen name="BuyerDetail" component={BuyerDetail} />
       <FarmerStack.Screen name="FarmerPayouts" component={FarmerPayouts} />
       <FarmerStack.Screen name="Messages" component={Messages} />
       <FarmerStack.Screen name="ChatThread" component={ChatThread} />

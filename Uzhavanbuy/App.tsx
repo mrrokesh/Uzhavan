@@ -1,7 +1,9 @@
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { AppState } from "react-native";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./src/context/AuthContext";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { UpdateGate } from "./src/components/UpdateGate";
@@ -22,13 +24,24 @@ const queryClient = new QueryClient({
       retry,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
       staleTime: 30_000,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchIntervalInBackground: false,
     },
     mutations: { retry },
   },
 });
 
 export default function App() {
+  // React Native has no window focus, so tell React Query when the app goes to
+  // the background. Polling screens then stop calling the server while nobody
+  // is looking, and catch up the moment the app returns.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      focusManager.setFocused(state === "active");
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

@@ -141,6 +141,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   bannerTitle: { fontSize: 13, fontWeight: "600", color: colors.forest },
-  bannerSub: { fontSize: 11.5, color: "#1B5E3BAA" },
+  bannerSub: { fontSize: 11.5, color: "#157A32AA" },
   bannerAction: { fontSize: 13, fontWeight: "700", color: colors.forest },
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, Share, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -10,6 +10,7 @@ import { ApiError } from "../lib/api";
 import { inr, kg } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, shadow } from "../theme";
+import { Avatar } from "../components/Avatar";
 
 export function CropDetail() {
   const { id } = useRoute<RouteProp<RootStackParamList, "CropDetail">>().params;
@@ -74,32 +75,32 @@ export function CropDetail() {
                 color={isSaved ? colors.danger : colors.ink}
               />
             </Pressable>
-            <Pressable style={styles.fab}>
+            <Pressable
+              style={styles.fab}
+              onPress={() =>
+                Share.share({
+                  message: `${crop.title} from ${crop.farmName} on Uzhavan Buy — ${inr(crop.pricePerKg)}/kg`,
+                }).catch(() => {})
+              }
+              accessibilityLabel="Share"
+            >
               <Ionicons name="share-outline" size={18} color={colors.ink} />
             </Pressable>
-            <Pressable style={styles.fab} onPress={() => navigation.navigate("Tabs")}>
-              <Ionicons name="cart-outline" size={18} color={colors.ink} />
-            </Pressable>
           </View>
-          {crop.hasVideo ? (
-            <View style={styles.play}>
-              <Ionicons name="play" size={22} color={colors.ink} />
-            </View>
-          ) : null}
           <View style={styles.dots}>
             {crop.gallery.map((_, i) => (
               <Pressable key={i} onPress={() => setSlide(i)} style={[styles.dot, i === slide && styles.dotOn]} />
             ))}
           </View>
           <View style={styles.gallery}>
-            <Text style={styles.galleryText}>🖼 Gallery · {crop.gallery.length}</Text>
+            <Text style={styles.galleryText}>Gallery · {crop.gallery.length}</Text>
           </View>
         </View>
 
         <View style={styles.pad}>
           <View style={{ flexDirection: "row" }}>
             <Chip
-              label={`🕒 ${crop.statusLabel}`}
+              label={crop.statusLabel}
               tone={crop.status === "ready" ? "mint" : "amber"}
             />
           </View>
@@ -124,15 +125,19 @@ export function CropDetail() {
             style={styles.farmer}
             onPress={() => navigation.navigate("FarmerProfile", { farmId: crop.farmId, cropId: crop.id })}
           >
-            <Image source={crop.avatar} style={styles.av} />
+            <Avatar size={48} />
             <View style={{ flex: 1 }}>
               <Text style={styles.farm}>
-                {crop.farmName} <Text style={{ color: colors.blueTick }}>✓</Text>
+                {crop.farmName}{" "}
+                {crop.sellerVerified ? <Text style={{ color: colors.blueTick }}>✓</Text> : null}
               </Text>
               <Text style={styles.muted}>
-                {crop.ownerName} · ★ {crop.rating.toFixed(1)}
+                {crop.ownerName} · {crop.rating.toFixed(1)} rating
               </Text>
-              <Text style={styles.muted}>{crop.district}</Text>
+              <Text style={styles.muted}>
+                {crop.district}
+                {crop.distanceKm != null && crop.distanceKm > 0 ? ` · ${crop.distanceKm} km away` : ""}
+              </Text>
             </View>
             <Text style={styles.link}>View farmer ›</Text>
           </Pressable>
@@ -163,7 +168,7 @@ export function CropDetail() {
 
           <View style={styles.specs}>
             <Spec label="Farm location" value={crop.location} icon="location-outline" />
-            <Spec label="Category" value={crop.category} icon="leaf-outline" />
+            <Spec label="Category" value={crop.category} icon="grid-outline" />
             <Spec label="Expected harvest" value={crop.harvestDate} icon="calendar-outline" />
             <Spec label="Minimum order" value={kg(crop.minOrderKg)} icon="bag-outline" />
           </View>
@@ -236,7 +241,6 @@ const styles = StyleSheet.create({
   availBar: { height: "100%", backgroundColor: colors.forest },
   availText: { fontSize: 12, color: colors.forest, fontWeight: "500" },
   farmer: { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, ...shadow },
-  av: { width: 48, height: 48, borderRadius: 24 },
   messageRow: {
     marginTop: 8,
     flexDirection: "row",

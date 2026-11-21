@@ -62,7 +62,7 @@ export function BookTrackHome() {
         {rows.map((o) => (
           <View key={o.id} style={styles.card}>
             <View style={{ flexDirection: "row" }}>
-              <Chip label="🌱 Ready for pickup" tone="mint" />
+              <Chip label="Ready for pickup" tone="mint" />
             </View>
             <View style={styles.row}>
               <Image source={imageFor(o.crop?.imageKey)} style={styles.img64} />

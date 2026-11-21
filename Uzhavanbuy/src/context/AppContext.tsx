@@ -12,6 +12,8 @@ type AppState = {
   setFilter: (f: FilterChip) => void;
   search: string;
   setSearch: (s: string) => void;
+  savedOnly: boolean;
+  setSavedOnly: (on: boolean) => void;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -19,10 +21,11 @@ const AppContext = createContext<AppState | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [filter, setFilter] = useState<FilterChip>("for-you");
   const [search, setSearch] = useState("");
+  const [savedOnly, setSavedOnly] = useState(false);
 
   const value = useMemo<AppState>(
-    () => ({ filter, setFilter, search, setSearch }),
-    [filter, search],
+    () => ({ filter, setFilter, search, setSearch, savedOnly, setSavedOnly }),
+    [filter, search, savedOnly],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

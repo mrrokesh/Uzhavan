@@ -16,6 +16,9 @@ const CATEGORIES = [
   "ACCOUNT",
   "VERIFICATION",
   "APP_ISSUE",
+  "COMPLAINT",
+  "REFUND",
+  "URGENT_CROP",
   "OTHER",
 ] as const;
 
@@ -71,7 +74,15 @@ ticketsRouter.post(
         subject: body.subject,
         orderCode: body.orderCode,
         // Anything about money or a missing delivery starts above normal.
-        priority: body.category === "PAYMENT" || body.category === "DELIVERY" ? "HIGH" : "NORMAL",
+        priority:
+          body.category === "URGENT_CROP"
+            ? "URGENT"
+            : body.category === "REFUND" ||
+                body.category === "COMPLAINT" ||
+                body.category === "PAYMENT" ||
+                body.category === "DELIVERY"
+              ? "HIGH"
+              : "NORMAL",
         assignedToId: assignee,
         assignedAt: assignee ? new Date() : null,
         status: assignee ? "ASSIGNED" : "OPEN",

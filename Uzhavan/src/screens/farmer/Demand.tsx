@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppHeader, Screen } from "../../components/Chrome";
 import { Chip, InfoNote } from "../../components/ui";
-import { useDemand } from "../../api/hooks";
+import { useDemand, useStartConversation } from "../../api/hooks";
+import { ApiError } from "../../lib/api";
 import { inr, kg } from "../../lib/format";
+import type { FarmerStackParamList } from "../../navigation/types";
 import { colors, shadow } from "../../theme";
 
 const RADII = [100, 200, 400] as const;
@@ -17,14 +21,41 @@ const RADII = [100, 200, 400] as const;
  * individual requests, because those are a private negotiation between one
  * buyer and one farm.
  */
+function cropTitle(category: string) {
+  const parts = category.split("·").map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[parts.length - 1] : category;
+}
+
 export function Demand() {
+  const navigation = useNavigation<NativeStackNavigationProp<FarmerStackParamList>>();
   const [radiusKm, setRadiusKm] = useState<number>(200);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const demand = useDemand(radiusKm);
+  const startChat = useStartConversation();
 
   const data = demand.data;
   const trends = data?.trends ?? [];
   const buyers = data?.buyers ?? [];
   const gaps = trends.filter((t) => t.gap);
+
+  const talkToBuyer = async (buyer: { id: string; name: string; business: string | null }) => {
+    setTalkingTo(buyer.id);
+    try {
+      const convo = await startChat.mutateAsync({ buyerId: buyer.id });
+      navigation.navigate("ChatThread", {
+        conversationId: convo.id,
+        name: buyer.business ?? buyer.name,
+      });
+    } catch (err) {
+      Alert.alert(
+        "Couldn't open the chat",
+        err instanceof ApiError ? err.message : "Check your connection and try again.",
+      );
+    } finally {
+      setTalkingTo(null);
+    }
+  };
 
   return (
     <Screen>
@@ -73,27 +104,78 @@ export function Demand() {
         ) : null}
 
         {trends.length > 0 ? <Text style={styles.section}>Demand by crop</Text> : null}
-        {trends.map((t) => (
-          <View key={t.category} style={styles.card}>
-            <View style={styles.between}>
-              <Text style={styles.cardTitle}>{t.category}</Text>
-              {t.gap ? <Chip label="You don’t list this" tone="amber" /> : null}
-            </View>
-            <Text style={styles.big}>{kg(t.totalKg)}</Text>
-            <Text style={styles.muted}>
-              {t.requests} request{t.requests === 1 ? "" : "s"}
-              {t.avgPricePerKg ? ` · avg ${inr(t.avgPricePerKg)}/kg` : ""}
-            </Text>
-            <View style={styles.barTrack}>
-              <View style={[styles.barFill, { width: `${Math.min(100, t.acceptRate)}%` }]} />
-            </View>
-            <Text style={styles.faint}>{t.acceptRate}% of these got accepted by a farm</Text>
-          </View>
-        ))}
+        {trends.map((t) => {
+          const open = openCategory === t.category;
+          const asked = t.buyers ?? [];
+          return (
+            <Pressable
+              key={t.category}
+              style={styles.card}
+              onPress={() => setOpenCategory(open ? null : t.category)}
+            >
+              <View style={styles.between}>
+                <Text style={styles.cardTitle}>{t.category}</Text>
+                {t.gap ? <Chip label="You don’t list this" tone="amber" /> : null}
+              </View>
+              <Text style={styles.big}>{kg(t.totalKg)}</Text>
+              <Text style={styles.muted}>
+                {t.requests} request{t.requests === 1 ? "" : "s"}
+                {t.avgPricePerKg ? ` · avg ${inr(t.avgPricePerKg)}/kg` : ""}
+              </Text>
+              <View style={styles.barTrack}>
+                <View style={[styles.barFill, { width: `${Math.min(100, t.acceptRate)}%` }]} />
+              </View>
+              <Text style={styles.faint}>{t.acceptRate}% of these got accepted by a farm</Text>
+              {open ? (
+                <View style={styles.actions}>
+                  {t.gap ? (
+                    <Pressable
+                      style={styles.action}
+                      onPress={() =>
+                        navigation.navigate("CropForm", {
+                          prefill: {
+                            title: cropTitle(t.category),
+                            category: t.category,
+                            pricePerKg: t.avgPricePerKg ? String(t.avgPricePerKg) : undefined,
+                          },
+                        })
+                      }
+                    >
+                      <Ionicons name="add" size={16} color={colors.white} />
+                      <Text style={styles.actionText}>Add</Text>
+                    </Pressable>
+                  ) : null}
+                  {asked.map((buyer) => (
+                    <Pressable
+                      key={buyer.id}
+                      style={[styles.action, styles.actionQuiet]}
+                      disabled={talkingTo === buyer.id}
+                      onPress={() => void talkToBuyer(buyer)}
+                    >
+                      <Ionicons name="chatbubble-outline" size={15} color={colors.forest} />
+                      <Text style={styles.actionQuietText}>
+                        {talkingTo === buyer.id
+                          ? "Opening…"
+                          : `Talk to ${buyer.business ?? buyer.name}`}
+                      </Text>
+                    </Pressable>
+                  ))}
+                  {!t.gap && asked.length === 0 ? (
+                    <Text style={styles.faint}>You already list this, and no buyer is waiting to talk.</Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        })}
 
         {buyers.length > 0 ? <Text style={styles.section}>Buyers in range</Text> : null}
         {buyers.map((b) => (
-          <View key={b.id} style={[styles.card, styles.row]}>
+          <Pressable
+            key={b.id}
+            style={[styles.card, styles.row]}
+            onPress={() => navigation.navigate("BuyerDetail", b)}
+          >
             <View style={styles.avatar}>
               <Ionicons name="storefront-outline" size={18} color={colors.forest} />
             </View>
@@ -113,7 +195,8 @@ export function Demand() {
                 {b.orders} order{b.orders === 1 ? "" : "s"} placed
               </Text>
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.faint} />
+          </Pressable>
         ))}
 
         {buyers.length > 0 ? (
@@ -165,6 +248,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   barFill: { height: 6, borderRadius: 3, backgroundColor: colors.forest },
+  actions: { marginTop: 12, gap: 8 },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.forest,
+  },
+  actionQuiet: { backgroundColor: colors.mint },
+  actionText: { fontSize: 13.5, fontWeight: "600", color: colors.white },
+  actionQuietText: { fontSize: 13.5, fontWeight: "600", color: colors.forest },
   empty: { marginTop: 40, textAlign: "center", fontSize: 13.5, lineHeight: 20, color: colors.muted },
   foot: { marginTop: 20, textAlign: "center", fontSize: 12, lineHeight: 18, color: colors.faint },
 });

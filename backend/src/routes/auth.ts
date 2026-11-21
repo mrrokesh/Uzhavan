@@ -9,6 +9,7 @@ import { asyncHandler, HttpError } from "../http.js";
 import { resolveDistrict } from "../data/districts.js";
 import { normalisePlate } from "../lib/plate.js";
 import { LIMITS, callerIp, clear, describeWait, enforce, lockoutSeconds } from "../ratelimit.js";
+import { confirmSignupCode, sendSignupCode } from "../notifyEmail.js";
 
 export const authRouter = Router();
 
@@ -22,6 +23,7 @@ const base = {
   password: z.string().min(8, "Password must be at least 8 characters"),
   name: z.string().trim().min(2, "Enter your name"),
   phone: z.string().trim().min(8, "Enter a phone number"),
+  emailCode: z.string().trim().regex(/^[0-9]{6}$/, "The email code is 6 digits"),
 };
 
 const registerBody = z.discriminatedUnion("role", [
@@ -47,7 +49,8 @@ const registerBody = z.discriminatedUnion("role", [
     plate: z.string().trim().min(4, "Enter your number plate"),
     capacityTons: z.coerce.number().positive("Enter the load capacity"),
     body: z.enum(["Open body", "Closed body"]).default("Open body"),
-    price: z.coerce.number().int().positive("Enter your base fare"),
+    price: z.coerce.number().int().positive("Enter your standard fare"),
+    ratePerKm: z.coerce.number().int().min(0).optional(),
   }),
 ]);
 
@@ -57,11 +60,29 @@ async function issue(userId: string) {
 }
 
 authRouter.post(
+  "/email/otp",
+  asyncHandler(async (req, res) => {
+    enforce(req, "email-otp", LIMITS.emailOtp);
+    const email = z.string().trim().email().toLowerCase().parse(req.body?.email);
+    enforce(req, "email-otp-target", LIMITS.emailOtpTarget, email);
+    const sent = await sendSignupCode(email);
+    res.json({ sent: true, expiresAt: sent.expiresAt });
+  }),
+);
+
+authRouter.post(
   "/register",
   asyncHandler(async (req, res) => {
     // Signup is cheap for us and cheap to automate; cap it per address.
     enforce(req, "register", LIMITS.register);
     const body = registerBody.parse(req.body);
+    const check = await confirmSignupCode(body.email, body.emailCode);
+    if (!check.valid) {
+      if (check.attemptsRemaining === 0) {
+        throw new HttpError(429, "Too many wrong codes. Send a new one.");
+      }
+      throw new HttpError(400, "That code is wrong or has expired. Check the email and try again.");
+    }
     const passwordHash = await hashPassword(body.password);
 
     try {
@@ -123,7 +144,13 @@ authRouter.post(
           },
         });
         const driver = await tx.driver.create({
-          data: { userId: created.id, name: body.name, photoKey: "selvam" },
+          data: {
+            userId: created.id,
+            name: body.name,
+            photoKey: "selvam",
+            verified: false,
+            online: false,
+          },
         });
         const capacityKg = Math.round(body.capacityTons * 1000);
         await tx.truck.create({
@@ -134,6 +161,7 @@ authRouter.post(
             capacityTons: body.capacityTons,
             capacityKg,
             price: body.price,
+            ratePerKm: body.ratePerKm ?? 0,
             body: body.body,
             plate: body.plate.toUpperCase(),
             plateKey: normalisePlate(body.plate),
