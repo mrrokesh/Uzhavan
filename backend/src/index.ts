@@ -69,8 +69,9 @@ app.get("/", (req, res) => {
     res.type("html").send(`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>Uzhavan API</title>
-<body style="font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5">
+<body style="font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; background: #fff; color: #17191C">
 <h1>Uzhavan API</h1>
 <p>This address is running. The apps call <code>/api/</code>.</p>
 </body>`);
