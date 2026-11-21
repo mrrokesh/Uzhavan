@@ -61,6 +61,28 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
+// Opening the host in a browser used to hit the catch-all and show {"error":"Not found"}.
+// The address itself is the API, so answer here. Health checks also call GET /.
+app.get("/", (req, res) => {
+  const accept = req.get("accept") ?? "";
+  if (accept.includes("text/html")) {
+    res.type("html").send(`<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uzhavan API</title>
+<body style="font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5">
+<h1>Uzhavan API</h1>
+<p>This address is running. The apps call <code>/api/</code>.</p>
+</body>`);
+    return;
+  }
+  res.json({ ok: true, service: "Uzhavan API" });
+});
+
+app.get("/favicon.ico", (_req, res) => {
+  res.status(204).end();
+});
+
 app.use("/api/errors", errorsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth/password", passwordRouter);
